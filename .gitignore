@@ -1,0 +1,12 @@
+.env
+keys.txt
+
+multi_orders.json
+
+venv/
+env/
+.venv/
+
+__pycache__/
+*.py[cod]
+.DS_Store
