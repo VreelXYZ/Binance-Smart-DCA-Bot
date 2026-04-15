@@ -2,7 +2,8 @@ import ccxt
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+current_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(current_dir, '.env'))
 
 API_KEY = os.getenv('BINANCE_API_KEY')
 SECRET_KEY = os.getenv('BINANCE_SECRET_KEY')
@@ -14,6 +15,10 @@ def main():
             'apiKey': API_KEY,
             'secret': SECRET_KEY,
             'enableRateLimit': True,
+            'timeout': 30000,
+            'options': {
+                'adjustForTimeDifference': True,
+            }
         })
     except Exception as e:
         print(f"❌ Connection error: {e}")

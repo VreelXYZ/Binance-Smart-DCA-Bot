@@ -5,11 +5,12 @@ import os
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+current_dir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(current_dir, '.env'))
 
 API_KEY = os.getenv('BINANCE_API_KEY')
 SECRET_KEY = os.getenv('BINANCE_SECRET_KEY')
-FILE_NAME = 'multi_orders.json'
+FILE_NAME = os.path.join(current_dir, 'multi_orders.json')
 TG_TOKEN = os.getenv('TG_TOKEN')
 TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 
@@ -72,6 +73,10 @@ def main():
         'apiKey': API_KEY,
         'secret': SECRET_KEY,
         'enableRateLimit': True,
+        'timeout': 30000,
+        'options': {
+            'adjustForTimeDifference': True,
+        }
     })
     exchange.load_markets()
 
