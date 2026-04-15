@@ -17,7 +17,7 @@ TG_CHAT_ID = os.getenv('TG_CHAT_ID')
 def send_telegram(text):
     try:
         url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": TG_CHAT_ID, "text": text})
+        requests.post(url, data={"chat_id": TG_CHAT_ID, "text": text}, timeout=10)
     except Exception as e:
         print(f"TG Error: {e}")
 
@@ -74,6 +74,7 @@ def main():
         'secret': SECRET_KEY,
         'enableRateLimit': True,
         'timeout': 30000,
+        'hostname': 'api1.binance.com',
         'options': {
             'adjustForTimeDifference': True,
         }

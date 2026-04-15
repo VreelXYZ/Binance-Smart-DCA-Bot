@@ -23,6 +23,7 @@ def main():
             'secret': SECRET_KEY,
             'enableRateLimit': True,
             'timeout': 30000,
+            'hostname': 'api1.binance.com',
             'options': {
                 'adjustForTimeDifference': True,
             }
