@@ -2,6 +2,7 @@
 keys.txt
 
 multi_orders.json
+aggressor_orders.json
 
 venv/
 env/
