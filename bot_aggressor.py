@@ -25,12 +25,12 @@ SAFETY_PCT = 0.15 # 15% for each safety order (levels 1-4)
 # Drop steps FROM THE PREVIOUS LEVEL: 1%, 1.5%, 2%, 2.5%
 DROP_STEPS = [0.01, 0.015, 0.02, 0.025] 
 
-TRAIL_TRIGGER = 0.010   # +1.0% tracking starts
-TRAIL_CALLBACK = 0.003  # -0.3% pullback for selling
+# Trailing settings are determined dynamically in the loop based on level
+# Level 0: 1.5% trigger, 0.4% callback. Levels 1-4: 1.0% trigger, 0.3% callback.
 STOP_LOSS = 0.10        # -10% from Base price (full exit)
 
 blacklisted_symbols = set() # Store symbols here after Stop-Loss
-cooldown_timers = {} # symbol -> timestamp (cooldown expiration time)
+cooldown_data = {} # symbol -> {'expire_time': timestamp, 'sale_price': price}
 entry_check_timers = {} # symbol -> timestamp (15 sec entry check delay)
 
 def send_telegram(text):
@@ -77,6 +77,7 @@ def cancel_all_for_symbol(exchange, active_orders, symbol):
     save_orders(active_orders)
 
 def main():
+    global SYMBOLS, TOTAL_BUDGET
     exchange = ccxt.binance({
         'apiKey': API_KEY,
         'secret': SECRET_KEY,
@@ -95,6 +96,7 @@ def main():
             
             raw_symbols = os.getenv('AGGRESSOR_SYMBOLS', '').replace(' ', '')
             SYMBOLS = raw_symbols.split(',') if raw_symbols else []
+            TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT', 0))
             
             raw_exits = os.getenv('AGGRESSOR_EXIT_SYMBOLS', '').replace(' ', '')
             EXIT_SYMBOLS = raw_exits.split(',') if raw_exits else []
@@ -135,13 +137,19 @@ def main():
                 if symbol in blacklisted_symbols:
                     continue
                 
-                if symbol in cooldown_timers and time.time() < cooldown_timers[symbol]:
-                    continue
-
                 symbol_data = {k: v for k, v in active_orders.items() if v['symbol'] == symbol}
                 positions = {k: v for k, v in symbol_data.items() if v['side'] == 'position'}
                 limit_buys = {k: v for k, v in symbol_data.items() if v['side'] == 'buy'}
                 current_price = tickers[symbol]['last'] if symbol in tickers else 0
+                
+                if symbol in cooldown_data:
+                    c_data = cooldown_data[symbol]
+                    if current_price > 0:
+                        if current_price <= c_data['sale_price'] * 0.99 or time.time() >= c_data['expire_time']:
+                            del cooldown_data[symbol]
+                            send_telegram(f"📡 {symbol}: Radar mode activated! Waiting for buyers market to re-enter.")
+                        else:
+                            continue
 
                 # --- 1. EMERGENCY STOP-LOSS (-10%) ---
                 base_pos = next((v for v in positions.values() if v['level'] == 0), None)
@@ -236,24 +244,28 @@ def main():
                     b_price = p_data['buy_price']
                     lvl = p_data['level']
                     
+                    trigger_pct = 0.015 if lvl == 0 else 0.010
+                    callback_pct = 0.004 if lvl == 0 else 0.003
+                    
                     if not p_data['trailing']:
                         # Enable trailing
-                        if current_price >= b_price * (1 + TRAIL_TRIGGER):
+                        if current_price >= b_price * (1 + trigger_pct):
                             p_data['trailing'] = True
                             p_data['high_watermark'] = current_price
-                            send_telegram(f"🎯 {symbol}: Trailing activated for (Lvl {lvl})!")
+                            send_telegram(f"🎯 {symbol}: Trailing activated for (Lvl {lvl}) via {trigger_pct*100}% trigger!")
                             save_orders(active_orders)
                     else:
                         hw = p_data['high_watermark']
                         if current_price > hw:
                             p_data['high_watermark'] = current_price
                             save_orders(active_orders)
-                        elif current_price <= hw * (1 - TRAIL_CALLBACK):
+                        elif current_price <= hw * (1 - callback_pct):
                             # SELL!
                             try:
-                                exchange.create_market_sell_order(symbol, p_data['amount'])
-                                profit_pct = ((current_price - b_price) / b_price) * 100
-                                send_telegram(f"✅ {symbol}: SOLD (Lvl {lvl}) at {current_price}!\nProfit: +{profit_pct:.2f}%")
+                                sell_order = exchange.create_market_sell_order(symbol, p_data['amount'])
+                                actual_sell_price = sell_order.get('average') or current_price
+                                profit_pct = ((actual_sell_price - b_price) / b_price) * 100
+                                send_telegram(f"✅ {symbol}: SOLD (Lvl {lvl}) at {actual_sell_price}!\nProfit: +{profit_pct:.2f}%")
                                 
                                 del active_orders[pid]
                                 
@@ -262,10 +274,13 @@ def main():
                                     # Sold base -> cancel all limit orders and wait for new base
                                     cancel_all_for_symbol(exchange, active_orders, symbol)
                                     send_telegram(f"♻️ {symbol}: Base sold. Grid reset, waiting for new entry.")
-                                    send_telegram("⏳ Waiting 5 minutes (market cooling) before searching for a new entry point...")
-                                    cooldown_timers[symbol] = time.time() + 300
+                                    send_telegram("⏳ Waiting for 1% drop OR 5 minutes (market cooling)...")
+                                    cooldown_data[symbol] = {
+                                        'expire_time': time.time() + 300,
+                                        'sale_price': actual_sell_price
+                                    }
                                 else:
-                                    # Sold level N -> cancel limit order N+1 and place limit order N at the same price
+                                    # Sold level N -> cancel limit order N+1 and place limit order N dynamically from actual sale price
                                     next_lvl = lvl + 1
                                     # Find and cancel order N+1
                                     for oid, l_data in list(active_orders.items()):
@@ -275,15 +290,19 @@ def main():
                                                 del active_orders[oid]
                                             except: pass
                                     
-                                    # Returning entry for the sold level N
+                                    # Returning entry for the sold level N dynamically from actual sale price
+                                    step_index = lvl - 1 if lvl > 0 else 0
+                                    buy_limit_price = actual_sell_price * (1 - DROP_STEPS[step_index])
+                                    safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
+                                    
                                     so_usdt = TOTAL_BUDGET * SAFETY_PCT
-                                    so_amount = float(exchange.amount_to_precision(symbol, so_usdt / b_price))
-                                    new_order = exchange.create_limit_buy_order(symbol, so_amount, b_price) # b_price is the same price at which we originally bought it
+                                    so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
+                                    new_order = exchange.create_limit_buy_order(symbol, so_amount, safe_price)
                                     active_orders[new_order['id']] = {
                                         'symbol': symbol, 'side': 'buy', 'level': lvl,
-                                        'price': b_price, 'amount': so_amount
+                                        'price': safe_price, 'amount': so_amount
                                     }
-                                    send_telegram(f"🔄 {symbol}: Re-placed entry for (Lvl {lvl}).")
+                                    send_telegram(f"🔄 {symbol}: Re-placed entry for (Lvl {lvl}) at {safe_price} (from sale at {actual_sell_price}).")
                                     save_orders(active_orders)
 
                             except Exception as e:
