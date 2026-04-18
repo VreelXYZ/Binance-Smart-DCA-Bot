@@ -276,9 +276,21 @@ def main():
                                                 del active_orders[oid]
                                             except: pass
                                     
-                                    # Dynamic re-entry for the sold level based on actual sale price
+                                    # Dynamic re-entry for the sold level N
                                     step_index = lvl - 1 if lvl > 0 else 0
-                                    buy_limit_price = actual_sell_price * (1 - DROP_STEPS[step_index])
+                                    
+                                    # Ensure we don't overlap grids by putting the grid above the previous level
+                                    prev_lvl_buy_price = None
+                                    for oid, v in list(active_orders.items()):
+                                        if v['symbol'] == symbol and v['side'] == 'position' and v['level'] == lvl - 1:
+                                            prev_lvl_buy_price = v['buy_price']
+                                            break
+                                    
+                                    reference_price = actual_sell_price
+                                    if prev_lvl_buy_price is not None:
+                                        reference_price = min(actual_sell_price, prev_lvl_buy_price)
+
+                                    buy_limit_price = reference_price * (1 - DROP_STEPS[step_index])
                                     safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
                                     
                                     so_usdt = TOTAL_BUDGET * SAFETY_PCT

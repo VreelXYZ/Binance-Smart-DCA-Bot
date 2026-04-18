@@ -20,10 +20,10 @@ SYMBOLS = raw_symbols.split(',') if raw_symbols else []
 TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT', 0))
 
 BASE_PCT = 0.20  # 20% for the first entry (level 0)
-SAFETY_PCT = 0.20 # 20% for each safety order (levels 1-4)
+SAFETY_PCT = 0.10 # 10% for each safety order (levels 1-8)
 
-# Drop steps FROM THE PREVIOUS LEVEL: 1%, 1.5%, 2%, 2.5%
-DROP_STEPS = [0.01, 0.015, 0.02, 0.025] 
+# Drop steps FROM THE PREVIOUS LEVEL (8 levels total)
+DROP_STEPS = [0.008, 0.008, 0.008, 0.009, 0.009, 0.009, 0.010, 0.010]
 
 # Trailing settings are determined dynamically in the loop based on level
 # Level 0: 1.5% trigger, 0.4% callback. Levels 1-4: 1.0% trigger, 0.3% callback.
@@ -223,7 +223,7 @@ def main():
                             del active_orders[oid]
                             
                             # Place next safety order (if exists)
-                            if lvl < 4:
+                            if lvl < 8:
                                 next_lvl = lvl + 1
                                 buy_limit_price = exec_price * (1 - DROP_STEPS[lvl]) # Step from current price
                                 safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
@@ -244,8 +244,8 @@ def main():
                     b_price = p_data['buy_price']
                     lvl = p_data['level']
                     
-                    trigger_pct = 0.015 if lvl == 0 else 0.010
-                    callback_pct = 0.004 if lvl == 0 else 0.003
+                    trigger_pct = 0.020 if lvl == 0 else 0.012
+                    callback_pct = 0.005 if lvl == 0 else 0.003
                     
                     if not p_data['trailing']:
                         # Enable trailing
@@ -290,9 +290,21 @@ def main():
                                                 del active_orders[oid]
                                             except: pass
                                     
-                                    # Returning entry for the sold level N dynamically from actual sale price
+                                    # Returning entry for the sold level N dynamically
                                     step_index = lvl - 1 if lvl > 0 else 0
-                                    buy_limit_price = actual_sell_price * (1 - DROP_STEPS[step_index])
+                                    
+                                    # Ensure we don't overlap grids by putting the grid above the previous level
+                                    prev_lvl_buy_price = None
+                                    for oid, v in list(active_orders.items()):
+                                        if v['symbol'] == symbol and v['side'] == 'position' and v['level'] == lvl - 1:
+                                            prev_lvl_buy_price = v['buy_price']
+                                            break
+                                    
+                                    reference_price = actual_sell_price
+                                    if prev_lvl_buy_price is not None:
+                                        reference_price = min(actual_sell_price, prev_lvl_buy_price)
+
+                                    buy_limit_price = reference_price * (1 - DROP_STEPS[step_index])
                                     safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
                                     
                                     so_usdt = TOTAL_BUDGET * SAFETY_PCT
