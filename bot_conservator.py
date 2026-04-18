@@ -6,7 +6,7 @@ import requests
 from dotenv import load_dotenv
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(current_dir, '.env'))
+load_dotenv(os.path.join(current_dir, '.env'), override=True)
 
 API_KEY = os.getenv('BINANCE_API_KEY')
 SECRET_KEY = os.getenv('BINANCE_SECRET_KEY')
@@ -86,6 +86,11 @@ def main():
     })
     exchange.load_markets()
     active_orders = load_orders()
+
+    # Re-read config one more time before starting to ensure we are using latest .env values
+    raw_symbols = os.getenv('CONSERVATOR_SYMBOLS', '').replace(' ', '')
+    SYMBOLS = raw_symbols.split(',') if raw_symbols else []
+    TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT_CONSERVATOR', 0))
 
     send_telegram(f"🚀 Conservator (Cascade) started! Symbols: {', '.join(SYMBOLS)}. Budget: {TOTAL_BUDGET}$")
 
