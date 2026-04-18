@@ -23,7 +23,7 @@ BASE_PCT = 0.20  # 20% for the first entry (level 0)
 SAFETY_PCT = 0.10 # 10% for each safety order (levels 1-8)
 
 # Drop steps FROM THE PREVIOUS LEVEL (8 levels total)
-DROP_STEPS = [0.008, 0.008, 0.008, 0.009, 0.009, 0.009, 0.010, 0.010]
+DROP_STEPS = [0.019, 0.019, 0.019, 0.019, 0.019, 0.019, 0.019, 0.019]
 
 # Trailing settings are determined dynamically in the loop based on level
 # Level 0: 1.5% trigger, 0.4% callback. Levels 1-4: 1.0% trigger, 0.3% callback.
@@ -252,8 +252,8 @@ def main():
                     b_price = p_data['buy_price']
                     lvl = p_data['level']
                     
-                    trigger_pct = 0.020 if lvl == 0 else 0.012
-                    callback_pct = 0.005 if lvl == 0 else 0.003
+                    trigger_pct = 0.030 if lvl == 0 else 0.019
+                    callback_pct = 0.005 if lvl == 0 else 0.004
                     
                     if not p_data['trailing']:
                         # Enable trailing

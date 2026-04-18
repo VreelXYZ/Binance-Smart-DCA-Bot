@@ -16,9 +16,9 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 | **Logic Priorirty** | Capital Protection & Steady Growth | Maximum Accumulation & "Moon" Trailing |
 | **Grid Depth** | **5 Safety Levels** (6 orders total) | **8 Safety Levels** (9 orders total) |
 | **Budget Split** | 20% Base / 16% per Safety Order | 20% Base / 10% per Safety Order |
-| **Entry Gaps** | Tight (0.4% - 1.0% steps) | Wide (0.8% - 1.0% steps) |
-| **Trailing Profit** | Sensitive (0.55% - 1.0% trigger) | Aggressive (1.2% - 2.0% trigger) |
-| **Safety Net** | Shallow grid for quick profit resets | **-10% Stop-Loss** for catastrophic protection |
+| **Entry Gaps** | Tight (0.4% - 1.0% steps) | Fixed **1.9% steps** (Deep coverage) |
+| **Trailing Profit** | Sensitive (0.55% - 1.0% trigger) | Aggressive (**1.9% - 3.0% trigger**) |
+| **Safety Net** | Shallow grid for quick profit resets | **-10% Stop-Loss** (~16.3% from Base entry) |
 
 ---
 
@@ -34,12 +34,12 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 ### 🔥 The Aggressor (`bot_aggressor.py`)
 *Designed for high-reward capture during market turbulence.*
 
-*   **Deep Value:** Covers a wide price range (up to 8 levels deep) to catch flash crashes and "wicks".
-*   **Runaway Profits:** Wider trailing targets allow the bot to ride strong momentum for maximum gains.
-*   **Emergency Brake:** Includes a hard Stop-Loss at **-10% from Average Entry Price** to protect against long-term downtrends.
+*   **Deep Value:** Covers a wide price range (8 levels at 1.9% each) to catch deep corrections, covering up to **~14.6%** drop.
+*   **Runaway Profits:** Higher trailing targets allow the bot to ride strong momentum for maximum gains.
+*   **Safety Buffer:** Includes a hard Stop-Loss at **-10% from Average Entry Price** (protects up to a total ~16.3% dump).
 *   **Aggressive Trailing:**
-    *   **Base:** +2.0% trigger / 0.5% callback.
-    *   **Safety Orders:** +1.2% trigger / 0.3% callback (~0.9% net profit).
+    *   **Base:** +3.0% trigger / 0.5% callback.
+    *   **Safety Orders:** +1.9% trigger / 0.4% callback.
 
 ### 📡 Market Scanner (`scanner.py`)
 *The "Bloodhound" Radar for finding pump candidates.*
