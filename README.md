@@ -41,6 +41,14 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
     *   **Base:** +2.0% trigger / 0.5% callback.
     *   **Safety Orders:** +1.2% trigger / 0.3% callback (~0.9% net profit).
 
+### 📡 Market Scanner (`scanner.py`)
+*The "Bloodhound" Radar for finding pump candidates.*
+
+*   **24h Guard:** Only scans coins with 0% to +15% daily growth to avoid buying at the absolute peak.
+*   **Volume Spike Detection:** Alerts when a 5-minute candle's volume is $\ge$ 3x the recent average.
+*   **Momentum Confirmation:** Requires a minimum +1.5% price jump within a single 5-minute candle.
+*   **Aggressor Integration:** Sends instant alerts to the Aggressor Telegram bot for manual or automated oversight.
+
 ---
 
 ## 🧠 Core Engineering Features
@@ -95,6 +103,9 @@ python bot_conservator.py
 
 # Run the high-volatility hunter
 python bot_aggressor.py
+
+# Run the pump radar
+python scanner.py
 ```
 
 ---
