@@ -152,10 +152,13 @@ def main():
                             continue
 
                 # --- 1. EMERGENCY STOP-LOSS (-10%) ---
-                base_pos = next((v for v in positions.values() if v['level'] == 0), None)
-                if base_pos and current_price > 0:
-                    if current_price <= base_pos['buy_price'] * (1 - STOP_LOSS):
-                        send_telegram(f"⛔️ PANIC! {symbol} dropped by 10%. Selling everything at market price!")
+                if positions and current_price > 0:
+                    total_cost = sum(p['buy_price'] * p['amount'] for p in positions.values())
+                    total_amount = sum(p['amount'] for p in positions.values())
+                    avg_price = total_cost / total_amount if total_amount > 0 else 0
+                    
+                    if avg_price > 0 and current_price <= avg_price * (1 - STOP_LOSS):
+                        send_telegram(f"⛔️ PANIC! {symbol} dropped by 10% from average price. Selling everything at market price!")
                         for pos_id, p_data in positions.items():
                             try:
                                 exchange.create_market_sell_order(symbol, p_data['amount'])

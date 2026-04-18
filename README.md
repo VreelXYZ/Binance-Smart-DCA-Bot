@@ -1,56 +1,105 @@
-# 🚀 Binance Smart DCA Bot: Master the Spot Market on Autopilot
+# 🚀 BotTrader: Binance Smart DCA Dual-Strategy Suite
 
-Tired of staring at charts, missing perfect entry points, or getting stuck in sudden market dips? Meet your new automated trading powerhouse, designed exclusively for the **Binance Spot market**.
+![BotTrader Banner](assets/banner.png)
 
-This isn't just another basic grid bot. It’s a highly adaptive algorithmic trading assistant built on a dual-strategy engine, designed to maximize your gains during bull runs and protect your capital during sudden crashes.
+Tired of staring at charts or missing perfect entries during market swings? **BotTrader** is a professional-grade automated trading system designed exclusively for the **Binance Spot market**. 
 
-## 🧠 How It Works: The Dual-Strategy Engine
-
-My bot treats the market like a professional trader, using a sophisticated separation between **Base Entries** and **Safety Nets**:
-
-* **The Base Order (Level 0):** When the market is stable or growing, the bot enters a position at the current market price. Instead of setting a boring, fixed target, it activates a **Wide Trailing Take Profit**. It lets your winning trades run, tracking the price upwards, and only executes a market sell when the trend exhausts and pulls back. *Result: You catch the massive moonshots, not just breadcrumbs.*
-* **The Dynamic Safety Grid (Levels 1, 2, 3...):** Crypto is volatile. If the market suddenly dumps, the bot doesn't panic. It deploys a series of limit buy orders below your entry. But here is the magic: the grid is **dynamic**. Instead of rigid 1% steps, the gaps expand as the price falls (e.g., -0.5%, -1.5%, -3.0%). It catches falling knives safely without draining your USDT budget too early.
-* **Quick-Escape Trailing for Drawdowns:** When the bot buys a dip via a Safety Order, it switches to a **Tight Trailing Take Profit**. At the very first sign of a market bounce, it quickly locks in a small profit and frees up your frozen capital.
-
-## ✨ Key Features at a Glance
-
-* 🛡️ **Adaptive DCA Strategy:** Buys the dip intelligently with expanding grid steps.
-* 📈 **Smart Trailing Take Profit:** Different trailing configurations for your Base Orders (to maximize huge gains) and Safety Orders (to quickly escape drawdowns).
-* 📱 **Live Telegram Integration:** You are never left in the dark. Connect your Telegram bot to receive instant, beautifully formatted reports on executed trades, cycle completions, and system status directly to your phone.
-* 🔒 **100% Secure & Local:** Your funds stay on your exchange. The bot uses API keys stored safely in a hidden `.env` file on your local machine. No third-party servers, no hidden fees.
-
-*Take emotions out of the equation. Let the math do the heavy lifting.*
+This suite features two distinct algorithmic powerhouses, allowing you to switch between **Capital Preservation** and **Aggressive Growth** depending on market volatility.
 
 ---
 
-## 🛠 Installation & Setup
+## 🛠 Choose Your Strategy
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/VreelXYZ/Binance-Smart-DCA-Bot.git](https://github.com/VreelXYZ/Binance-Smart-DCA-Bot.git)
-   cd Binance-Smart-DCA-Bot
-   ```
+| Feature | 🛡️ The Conservator | 🔥 The Aggressor |
+| :--- | :--- | :--- |
+| **Market Focus** | Low-to-Medium Volatility | High Volatility & Deep Dips |
+| **Logic Priorirty** | Capital Protection & Steady Growth | Maximum Accumulation & "Moon" Trailing |
+| **Grid Depth** | **5 Safety Levels** (6 orders total) | **8 Safety Levels** (9 orders total) |
+| **Budget Split** | 20% Base / 16% per Safety Order | 20% Base / 10% per Safety Order |
+| **Entry Gaps** | Tight (0.4% - 1.0% steps) | Wide (0.8% - 1.0% steps) |
+| **Trailing Profit** | Sensitive (0.55% - 1.0% trigger) | Aggressive (1.2% - 2.0% trigger) |
+| **Safety Net** | Shallow grid for quick profit resets | **-10% Stop-Loss** for catastrophic protection |
 
-2. **Install dependencies:**
-   The bot requires `ccxt` for exchange connection, `python-dotenv` for hidden variables, and `requests` for Telegram alerts.
-   ```bash
-   pip install ccxt python-dotenv requests
-   ```
+---
 
-3. **Configure API Keys:**
-   * Copy the `.env.example` file and rename it to `.env`.
-   * Open the new `.env` file and insert your Binance and Telegram credentials:
-     ```env
-     BINANCE_API_KEY=your_binance_api_key_here
-     BINANCE_SECRET_KEY=your_binance_secret_key_here
-     TG_TOKEN=your_telegram_bot_token_here
-     TG_CHAT_ID=your_telegram_chat_id_here
-     ```
+### 🛡️ The Conservator (`bot_conservator.py`)
+*Designed for stability and compound growth.*
 
-4. **Run the bot:**
-   ```bash
-   python bot.py
-   ```
+*   **Quick Resets:** Tighter trailing targets ensure the bot exits positions quickly when a trend reverses, keeping capital liquid.
+*   **Elastic Grid:** Uses dynamic distancing between safety orders to optimize entry prices during minor pullbacks.
+*   **Sensitive Trailing:** 
+    *   **Base:** +1.0% trigger / 0.3% callback.
+    *   **Safety Orders:** +0.55% trigger / 0.15% callback (~0.4% net profit).
+
+### 🔥 The Aggressor (`bot_aggressor.py`)
+*Designed for high-reward capture during market turbulence.*
+
+*   **Deep Value:** Covers a wide price range (up to 8 levels deep) to catch flash crashes and "wicks".
+*   **Runaway Profits:** Wider trailing targets allow the bot to ride strong momentum for maximum gains.
+*   **Emergency Brake:** Includes a hard Stop-Loss at **-10% from Average Entry Price** to protect against long-term downtrends.
+*   **Aggressive Trailing:**
+    *   **Base:** +2.0% trigger / 0.5% callback.
+    *   **Safety Orders:** +1.2% trigger / 0.3% callback (~0.9% net profit).
+
+---
+
+## 🧠 Core Engineering Features
+
+Both strategies are built upon a resilient, high-performance core:
+
+1.  **Independent Trailing Take Profit**: Every DCA level (Base and all Safety Orders) tracks the price upwards independently. The bot doesn't just sell at a fixed percentage; it rides the trend until exhaustion.
+2.  **Volume Filter (Bull Trap Shield)**: Before any entry, the bot analyzes the **5-minute Taker Volume**. It only enters when buying pressure significantly outweighs selling pressure.
+3.  **Dynamic Cascade Re-Entry**: When a safety level is sold, the bot dynamically re-places the entry order based on the actual sale price, maintaining mathematical grid integrity without overlap.
+4.  **Radar Mode & Market Cooling**: After a successful Base Sale, the bot enters "Radar Mode" for 5 minutes (or until a 1% price drop), preventing immediate FOMO re-entry.
+5.  **Hot Reload System**: Update your trading list, budget, or emergency exit list in the `.env` file, and the bot applies changes instantly without a restart.
+
+---
+
+## 📊 Setup & Deployment
+
+### 1. Installation
+```bash
+# Clone the repository
+git clone https://github.com/VreelXYZ/Binance-Smart-DCA-Bot.git
+cd Binance-Smart-DCA-Bot
+
+# Install required libraries
+pip install ccxt python-dotenv requests
+```
+
+### 2. Configuration (`.env`)
+Create a `.env` file in the root directory. You can run one or both bots simultaneously.
+
+```env
+# BINANCE CORE
+BINANCE_API_KEY=your_api_key
+BINANCE_SECRET_KEY=your_secret_key
+
+# CONSERVATOR CONFIG
+CONSERVATOR_SYMBOLS=BTC/USDT,ETH/USDT
+TOTAL_BUDGET_USDT_CONSERVATOR=1000
+TG_TOKEN=your_tg_token
+TG_CHAT_ID=your_chat_id
+
+# AGGRESSOR CONFIG
+AGGRESSOR_SYMBOLS=SOL/USDT,BNB/USDT
+TOTAL_BUDGET_USDT=500
+AGGRESSOR_TG_TOKEN=your_tg_token_2
+AGGRESSOR_TG_CHAT_ID=your_chat_id_2
+```
+
+### 3. Execution
+```bash
+# Run the safe compounder
+python bot_conservator.py
+
+# Run the high-volatility hunter
+python bot_aggressor.py
+```
+
+---
 
 ## ⚠️ Disclaimer
-This bot trades with real funds. The author is not responsible for any financial losses. It is highly recommended to test the algorithm with a small budget first. Ensure that your Binance API key has "Spot & Margin Trading" enabled, and **"Enable Withdrawals" strictly disabled**.
+Trading cryptocurrency involves significant risk. This software is provided "as is" for educational purposes. Always test with a small budget first. Ensure **"Enable Withdrawals"** is disabled on your API keys for maximum security.
+
+*Profit from volatility. Trust the algorithm.*
