@@ -48,12 +48,23 @@ def main():
     while True:
         try:
             print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting new scan cycle...")
-            
-            # Step 2: Get all tickers to evaluate the 24h change (ALL-TIME-HIGH PROTECTION)
+
+            # Step 1: Reload markets to get the latest list of tradable pairs.
+            # This is crucial for a long-running script to avoid using stale data (e.g., delisted pairs).
+            markets = exchange.load_markets(reload=True)
+
+            # Step 2: Get all tickers for the spot market.
             tickers = exchange.fetch_tickers()
             candidates = []
             
             for symbol, ticker_info in tickers.items():
+                if symbol not in markets:
+                    continue
+                
+                market = markets[symbol]
+                if not market.get('active', False) or not market.get('spot', False):
+                    continue
+
                 if not symbol.endswith("/USDT"):
                     continue
                     
@@ -70,11 +81,12 @@ def main():
                 if change_24h is None:
                     continue
                 
-                # Positive overall growth, but not exceeding +15%
-                if 0 < change_24h <= 15:
-                    candidates.append((symbol, change_24h))
+                if -10 <= change_24h <= 20:
+                    quote_volume_24h = ticker_info.get('quoteVolume')
+                    if quote_volume_24h and quote_volume_24h > 1000000:
+                        candidates.append((symbol, change_24h))
             
-            print(f"Found {len(candidates)} candidates matching the 24h filter.")
+            print(f"Found {len(candidates)} candidates matching 24h and volume filters.")
             
             for symbol, change_24h in candidates:
                 try:
