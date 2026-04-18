@@ -34,6 +34,9 @@ def main():
     # Initialize CCXT Binance instance without API keys
     exchange = ccxt.binance({
         'enableRateLimit': True,
+        'options': {
+        'defaultType': 'spot'
+        }
     })
     
     # Exclude exact stablecoins and fiats
