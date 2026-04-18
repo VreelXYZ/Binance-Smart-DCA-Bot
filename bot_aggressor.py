@@ -19,8 +19,8 @@ raw_symbols = os.getenv('AGGRESSOR_SYMBOLS', '').replace(' ', '')
 SYMBOLS = raw_symbols.split(',') if raw_symbols else []
 TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT', 0))
 
-BASE_PCT = 0.40  # 40% for the first entry (level 0)
-SAFETY_PCT = 0.15 # 15% for each safety order (levels 1-4)
+BASE_PCT = 0.20  # 20% for the first entry (level 0)
+SAFETY_PCT = 0.20 # 20% for each safety order (levels 1-4)
 
 # Drop steps FROM THE PREVIOUS LEVEL: 1%, 1.5%, 2%, 2.5%
 DROP_STEPS = [0.01, 0.015, 0.02, 0.025] 
