@@ -127,21 +127,30 @@ def main():
             for ex_sym in EXIT_SYMBOLS:
                 if ex_sym in blacklisted_symbols:
                     continue
-                symbol_data = {k: v for k, v in active_orders.items() if v['symbol'] == ex_sym}
-                if symbol_data:
-                    send_telegram(f"⚠️ {ex_sym}: Coin moved to EXIT list. Selling positions and cancelling orders!")
+                
+                send_telegram(f"⚠️ {ex_sym}: Coin moved to EXIT list. Selling positions and cancelling orders!")
+                
+                # 1. Cancel all limit orders and clear memory FIRST
+                cancel_all_for_symbol(exchange, active_orders, ex_sym)
+                
+                # 2. Sell ALL available balance of the coin directly from the exchange
+                base_coin = ex_sym.split('/')[0]
+                try:
+                    balance = exchange.fetch_free_balance()
+                    coin_balance = balance.get(base_coin, 0)
                     
-                    # 1. Sell active positions at market price
-                    positions = {k: v for k, v in symbol_data.items() if v['side'] == 'position'}
-                    for pid, p_data in positions.items():
-                        try:
-                            exchange.create_market_sell_order(ex_sym, p_data['amount'])
-                            send_telegram(f"✅ {ex_sym}: Emergency market sell completed.")
-                        except Exception as e:
-                            print(f"Error emergency selling {ex_sym}: {e}")
-                    
-                    # 2. Cancel all limit orders and clear memory
-                    cancel_all_for_symbol(exchange, active_orders, ex_sym)
+                    if coin_balance > 0:
+                        amount_to_sell = float(exchange.amount_to_precision(ex_sym, coin_balance))
+                        if amount_to_sell > 0:
+                            exchange.create_market_sell_order(ex_sym, amount_to_sell)
+                            send_telegram(f"✅ {ex_sym}: Emergency market sell completed ({amount_to_sell} {base_coin}).")
+                        else:
+                            send_telegram(f"ℹ️ {ex_sym}: Balance too small to sell ({coin_balance} {base_coin}).")
+                    else:
+                        send_telegram(f"ℹ️ {ex_sym}: No balance found on exchange to sell.")
+                except Exception as e:
+                    print(f"Error emergency selling {ex_sym}: {e}")
+                    send_telegram(f"❌ {ex_sym}: Sell failed! Error: {e}")
                 
                 # Blacklist the coin in case it is mistakenly left in SYMBOLS
                 blacklisted_symbols.add(ex_sym)
@@ -184,11 +193,29 @@ def main():
                     
                     if avg_price > 0 and current_price <= avg_price * (1 - STOP_LOSS):
                         send_telegram(f"⛔️ PANIC! {symbol} dropped by 10% from average price. Selling everything at market price!")
-                        for pos_id, p_data in positions.items():
-                            try:
-                                exchange.create_market_sell_order(symbol, p_data['amount'])
-                            except: pass
+                        
+                        # 1. Cancel all limit orders and clear memory FIRST
                         cancel_all_for_symbol(exchange, active_orders, symbol)
+                        
+                        # 2. Sell ALL available balance directly from the exchange
+                        base_coin = symbol.split('/')[0]
+                        try:
+                            balance = exchange.fetch_free_balance()
+                            coin_balance = balance.get(base_coin, 0)
+                            
+                            if coin_balance > 0:
+                                amount_to_sell = float(exchange.amount_to_precision(symbol, coin_balance))
+                                if amount_to_sell > 0:
+                                    exchange.create_market_sell_order(symbol, amount_to_sell)
+                                    send_telegram(f"✅ {symbol}: Stop-Loss market sell completed ({amount_to_sell} {base_coin}).")
+                                else:
+                                    send_telegram(f"ℹ️ {symbol}: Balance too small to sell ({coin_balance} {base_coin}).")
+                            else:
+                                send_telegram(f"ℹ️ {symbol}: No balance found on exchange to sell.")
+                        except Exception as e:
+                            print(f"Error Stop-Loss selling {symbol}: {e}")
+                            send_telegram(f"❌ {symbol}: Stop-Loss sell failed! Error: {e}")
+                            
                         blacklisted_symbols.add(symbol)
                         send_telegram(f"🛑 Trading for {symbol} has been fully stopped.")
                         continue
