@@ -16,9 +16,9 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 | **Logic Priorirty** | Capital Protection & Steady Growth | Maximum Accumulation & "Moon" Trailing |
 | **Grid Depth** | **5 Safety Levels** (6 orders total) | **8 Safety Levels** (9 orders total) |
 | **Budget Split** | 20% Base / 16% per Safety Order | 20% Base / 10% per Safety Order |
-| **Entry Gaps** | Tight (0.4% - 1.0% steps) | Fixed **1.9% steps** (Deep coverage) |
-| **Trailing Profit** | Sensitive (0.55% - 1.0% trigger) | Aggressive (**1.9% - 3.0% trigger**) |
-| **Safety Net** | Shallow grid for quick profit resets | **-10% Stop-Loss** (~16.3% from Base entry) |
+| **Entry Gaps** | Tight (0.4% - 1.0% steps) | **Expanding** (0.9% to 3.5% steps) |
+| **Trailing Profit** | **Hard Floor** (0.6% - 1.0%) | **Hard Floor** (0.95% - 1.95%) |
+| **Safety Net** | Shallow grid for quick profit resets | **-10% Stop-Loss** (~15.5% from Base entry) |
 
 ---
 
@@ -31,15 +31,20 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
     *   **Base:** +1.0% trigger / 0.3% callback.
     *   **Safety Orders:** +0.55% trigger / 0.15% callback (~0.4% net profit).
 
-### 🔥 The Aggressor (`bot_aggressor.py`)
-*Designed for high-reward capture during market turbulence.*
+*   **Expanding Grid:** Covers a logarithmic price range (`[0.009, 0.009, 0.012, 0.015, 0.019, ... 0.035]`) to catch micro-jumps early and hold deep dumps later.
+*   **Protected Profit:** Protected trailing aims to secure at least **+0.9%** profit once triggered (subject to market slippage).
+*   **Full Capital Deployment:** Includes a hard Stop-Loss at **-10% from Average Entry Price** (protects up to a total ~15.5% dump).
+*   **Aggressive Hard Floor:**
+    *   **Level 0 (Base):** 1.95% trigger / 0.5% callback / **1.90% Floor**.
+    *   **Levels 1-8 (Safety):** 0.95% trigger / 0.3% callback / **0.90% Floor**.
 
-*   **Deep Value:** Covers a wide price range (8 levels at 1.9% each) to catch deep corrections, covering up to **~14.6%** drop.
-*   **Runaway Profits:** Higher trailing targets allow the bot to ride strong momentum for maximum gains.
-*   **Safety Buffer:** Includes a hard Stop-Loss at **-10% from Average Entry Price** (protects up to a total ~16.3% dump).
-*   **Aggressive Trailing:**
-    *   **Base:** +3.0% trigger / 0.5% callback.
-    *   **Safety Orders:** +1.9% trigger / 0.4% callback.
+### 🛡️ The Conservator (`bot_conservator.py`)
+*Designed for stability and rapid compounding.*
+
+*   **Quick Turnaround:** Tighter targets ensure capital stays liquid for the next opportunity.
+*   **Conservative Hard Floor:**
+    *   **Level 0 (Base):** 1.0% trigger / 0.3% callback / **0.95% Floor**.
+    *   **Levels 1-5 (Safety):** 0.6% trigger / 0.2% callback / **0.55% Floor**.
 
 ### 📡 Market Scanner (`scanner.py`)
 *The "Bloodhound" Radar for finding pump candidates.*
@@ -58,8 +63,8 @@ Both strategies are built upon a resilient, high-performance core:
 1.  **Independent Trailing Take Profit**: Every DCA level (Base and all Safety Orders) tracks the price upwards independently. The bot doesn't just sell at a fixed percentage; it rides the trend until exhaustion.
 2.  **Volume Filter (Bull Trap Shield)**: Before any entry, the bot analyzes the **5-minute Taker Volume**. It only enters when buying pressure significantly outweighs selling pressure.
 3.  **Dynamic Cascade Re-Entry**: When a safety level is sold, the bot dynamically re-places the entry order based on the actual sale price, maintaining mathematical grid integrity without overlap.
-4.  **Radar Mode & Market Cooling**: After a successful Base Sale, the bot enters "Radar Mode" for 5 minutes (or until a 1% price drop), preventing immediate FOMO re-entry.
-5.  **Hot Reload System**: Update your trading list, budget, or emergency exit list in the `.env` file, and the bot applies changes instantly without a restart.
+4.  **Auto Grid Restoration (Hole Shield)**: On startup or during execution, the bot automatically detects missing grid levels (e.g. after a crash or restart). It repairs the grid with Limit orders, preventing slippage even if the price is already below the target.
+5.  **Market Cooling & Hot Reload**: After a Base Sale, the bot enters "Radar Mode" to prevent FOMO. Update symbols, budget, or emergency exits in `.env` instantly without restart.
 
 ---
 

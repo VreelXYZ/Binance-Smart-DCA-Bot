@@ -22,8 +22,8 @@ TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT', 0))
 BASE_PCT = 0.20  # 20% for the first entry (level 0)
 SAFETY_PCT = 0.10 # 10% for each safety order (levels 1-8)
 
-# Drop steps FROM THE PREVIOUS LEVEL (8 levels total)
-DROP_STEPS = [0.019, 0.019, 0.019, 0.019, 0.019, 0.019, 0.019, 0.019]
+# 8 levels: Scalp micro-jumps early on, hold the heavy drops later
+DROP_STEPS = [0.009, 0.009, 0.012, 0.015, 0.019, 0.025, 0.030, 0.035]
 
 # Trailing settings are determined dynamically in the loop based on level
 # Level 0: 1.5% trigger, 0.4% callback. Levels 1-4: 1.0% trigger, 0.3% callback.
@@ -252,81 +252,118 @@ def main():
                     b_price = p_data['buy_price']
                     lvl = p_data['level']
                     
-                    trigger_pct = 0.030 if lvl == 0 else 0.019
-                    callback_pct = 0.005 if lvl == 0 else 0.004
+                    trigger_pct = 0.0195 if lvl == 0 else 0.0095
+                    callback_pct = 0.005 if lvl == 0 else 0.003
+                    floor_pct = trigger_pct - 0.0005
                     
                     if not p_data['trailing']:
                         # Enable trailing
                         if current_price >= b_price * (1 + trigger_pct):
                             p_data['trailing'] = True
                             p_data['high_watermark'] = current_price
-                            send_telegram(f"🎯 {symbol}: Trailing activated for (Lvl {lvl}) via {trigger_pct*100}% trigger!")
+                            send_telegram(f"🎯 {symbol}: Trailing activated for (Lvl {lvl}). Minimum profit secured: {floor_pct*100}%!")
                             save_orders(active_orders)
                     else:
                         hw = p_data['high_watermark']
                         if current_price > hw:
                             p_data['high_watermark'] = current_price
                             save_orders(active_orders)
-                        elif current_price <= hw * (1 - callback_pct):
-                            # SELL!
-                            try:
-                                sell_order = exchange.create_market_sell_order(symbol, p_data['amount'])
-                                actual_sell_price = sell_order.get('average') or current_price
-                                profit_pct = ((actual_sell_price - b_price) / b_price) * 100
-                                send_telegram(f"✅ {symbol}: SOLD (Lvl {lvl}) at {actual_sell_price}!\nProfit: +{profit_pct:.2f}%")
+                        else:
+                            sell_threshold = max(hw * (1 - callback_pct), b_price * (1 + floor_pct))
+                            if current_price <= sell_threshold:
+                                # SELL!
+                                try:
+                                    sell_order = exchange.create_market_sell_order(symbol, p_data['amount'])
+                                    actual_sell_price = sell_order.get('average') or current_price
+                                    profit_pct = ((actual_sell_price - b_price) / b_price) * 100
+                                    send_telegram(f"✅ {symbol}: SOLD (Lvl {lvl}) at {actual_sell_price}!\nProfit: +{profit_pct:.2f}%")
                                 
-                                del active_orders[pid]
+                                    del active_orders[pid]
                                 
-                                # CASCADE LOGIC
-                                if lvl == 0:
-                                    # Sold base -> cancel all limit orders and wait for new base
-                                    cancel_all_for_symbol(exchange, active_orders, symbol)
-                                    send_telegram(f"♻️ {symbol}: Base sold. Grid reset, waiting for new entry.")
-                                    send_telegram("⏳ Waiting for 1% drop OR 5 minutes (market cooling)...")
-                                    cooldown_data[symbol] = {
-                                        'expire_time': time.time() + 300,
-                                        'sale_price': actual_sell_price
-                                    }
-                                else:
-                                    # Sold level N -> cancel limit order N+1 and place limit order N dynamically from actual sale price
-                                    next_lvl = lvl + 1
-                                    # Find and cancel order N+1
-                                    for oid, l_data in list(active_orders.items()):
-                                        if l_data['symbol'] == symbol and l_data['side'] == 'buy' and l_data['level'] == next_lvl:
-                                            try:
-                                                exchange.cancel_order(oid, symbol)
-                                                del active_orders[oid]
-                                            except: pass
+                                    # CASCADE LOGIC
+                                    if lvl == 0:
+                                        # Sold base -> cancel all limit orders and wait for new base
+                                        cancel_all_for_symbol(exchange, active_orders, symbol)
+                                        send_telegram(f"♻️ {symbol}: Base sold. Grid reset, waiting for new entry.")
+                                        send_telegram("⏳ Waiting for 1% drop OR 5 minutes (market cooling)...")
+                                        cooldown_data[symbol] = {
+                                            'expire_time': time.time() + 300,
+                                            'sale_price': actual_sell_price
+                                        }
+                                    else:
+                                        # Sold level N -> cancel limit order N+1 and place limit order N dynamically from actual sale price
+                                        next_lvl = lvl + 1
+                                        # Find and cancel order N+1
+                                        for oid, l_data in list(active_orders.items()):
+                                            if l_data['symbol'] == symbol and l_data['side'] == 'buy' and l_data['level'] == next_lvl:
+                                                try:
+                                                    exchange.cancel_order(oid, symbol)
+                                                    del active_orders[oid]
+                                                except: pass
                                     
-                                    # Returning entry for the sold level N dynamically
-                                    step_index = lvl - 1 if lvl > 0 else 0
+                                        # Returning entry for the sold level N dynamically
+                                        step_index = lvl - 1 if lvl > 0 else 0
                                     
-                                    # Ensure we don't overlap grids by putting the grid above the previous level
-                                    prev_lvl_buy_price = None
-                                    for oid, v in list(active_orders.items()):
-                                        if v['symbol'] == symbol and v['side'] == 'position' and v['level'] == lvl - 1:
-                                            prev_lvl_buy_price = v['buy_price']
-                                            break
+                                        # Ensure we don't overlap grids by putting the grid above the previous level
+                                        prev_lvl_buy_price = None
+                                        for oid, v in list(active_orders.items()):
+                                            if v['symbol'] == symbol and v['side'] == 'position' and v['level'] == lvl - 1:
+                                                prev_lvl_buy_price = v['buy_price']
+                                                break
                                     
-                                    reference_price = actual_sell_price
-                                    if prev_lvl_buy_price is not None:
-                                        reference_price = min(actual_sell_price, prev_lvl_buy_price)
+                                        reference_price = actual_sell_price
+                                        if prev_lvl_buy_price is not None:
+                                            reference_price = min(actual_sell_price, prev_lvl_buy_price)
 
-                                    buy_limit_price = reference_price * (1 - DROP_STEPS[step_index])
-                                    safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
+                                        buy_limit_price = reference_price * (1 - DROP_STEPS[step_index])
+                                        safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
                                     
-                                    so_usdt = TOTAL_BUDGET * SAFETY_PCT
-                                    so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
+                                        so_usdt = TOTAL_BUDGET * SAFETY_PCT
+                                        so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
+                                        new_order = exchange.create_limit_buy_order(symbol, so_amount, safe_price)
+                                        active_orders[new_order['id']] = {
+                                            'symbol': symbol, 'side': 'buy', 'level': lvl,
+                                            'price': safe_price, 'amount': so_amount
+                                        }
+                                        send_telegram(f"🔄 {symbol}: Re-placed entry for (Lvl {lvl}) at {safe_price} (from sale at {actual_sell_price}).")
+                                        save_orders(active_orders)
+
+                                except Exception as e:
+                                    print(f"Error selling {symbol}: {e}")
+
+                # --- 5. GRID RESTORATION ---
+                if positions:
+                    max_pos_lvl = max([p['level'] for p in positions.values()])
+                    if max_pos_lvl < 8:
+                        next_lvl = max_pos_lvl + 1
+                        has_next_limit = any(l['level'] == next_lvl for l in limit_buys.values())
+                        
+                        if not has_next_limit:
+                            prev_pos = [p for p in positions.values() if p['level'] == max_pos_lvl][0]
+                            prev_buy_price = prev_pos['buy_price']
+                            
+                            step_index = max_pos_lvl
+                            buy_limit_price = prev_buy_price * (1 - DROP_STEPS[step_index])
+                            safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
+                            
+                            so_usdt = TOTAL_BUDGET * SAFETY_PCT
+                            so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
+                            
+                            try:
+                                if current_price > 0:
+                                    if current_price <= safe_price:
+                                        send_telegram(f"🚨 {symbol}: Price already below missing Lvl {next_lvl} target ({safe_price})! Sending LIMIT order to buy immediately without slippage.")
+                                    else:
+                                        send_telegram(f"⚠️ {symbol}: Hole in the grid detected. Setting missing Limit for Lvl {next_lvl} at {safe_price}.")
+                                        
                                     new_order = exchange.create_limit_buy_order(symbol, so_amount, safe_price)
                                     active_orders[new_order['id']] = {
-                                        'symbol': symbol, 'side': 'buy', 'level': lvl,
+                                        'symbol': symbol, 'side': 'buy', 'level': next_lvl,
                                         'price': safe_price, 'amount': so_amount
                                     }
-                                    send_telegram(f"🔄 {symbol}: Re-placed entry for (Lvl {lvl}) at {safe_price} (from sale at {actual_sell_price}).")
                                     save_orders(active_orders)
-
                             except Exception as e:
-                                print(f"Error selling {symbol}: {e}")
+                                print(f"Error restoring limit order {symbol}: {e}")
 
             time.sleep(2)
 
