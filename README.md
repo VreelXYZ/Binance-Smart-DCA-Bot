@@ -65,6 +65,7 @@ Both strategies are built upon a resilient, high-performance core:
 3.  **Dynamic Cascade Re-Entry**: When a safety level is sold, the bot dynamically re-places the entry order based on the actual sale price, maintaining mathematical grid integrity without overlap.
 4.  **Auto Grid Restoration & Phantom Order Cleanup**: On startup or during execution, if a limit order is manually canceled on the exchange or lost, the bot detects the missing order (`OrderNotFound`), clears it from local memory, and seamlessly repairs the grid hole by calculating and placing a new limit order at the exact required level.
 5.  **Market Cooling & Hot Reload**: After a Base Sale, the bot enters "Radar Mode" to prevent FOMO. Update symbols, budget, or emergency exits in `.env` instantly without restart.
+6.  **Live Status Reporting via Telegram**: Get a detailed, real-time report of all active positions by sending the `/status` command to the bot. The report includes average entry price, PNL, bought levels, and active limit orders for each symbol.
 
 ---
 

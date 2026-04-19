@@ -76,6 +76,53 @@ def cancel_all_for_symbol(exchange, active_orders, symbol):
         active_orders.pop(k, None)
     save_orders(active_orders)
 
+def handle_telegram_commands(active_orders, tickers, drop_steps, update_id_container):
+    try:
+        url = f"https://api.telegram.org/bot{TG_TOKEN}/getUpdates"
+        res = requests.get(url, params={'offset': update_id_container[0] + 1}, timeout=1).json()
+        if res.get('ok') and res.get('result'):
+            for update in res['result']:
+                update_id_container[0] = update['update_id']
+                msg = update.get('message', {})
+                if str(msg.get('chat', {}).get('id')) == str(TG_CHAT_ID) and msg.get('text') == '/status':
+                    report = "📊 **STATUS REPORT**\n\n"
+                    active_syms = set(v['symbol'] for v in active_orders.values())
+                    if not active_syms:
+                        send_telegram(report + "No active positions or orders.")
+                        continue
+                    
+                    for sym in active_syms:
+                        s_ords = [v for v in active_orders.values() if v['symbol'] == sym]
+                        pos = [p for p in s_ords if p['side'] == 'position']
+                        limits = [l for l in s_ords if l['side'] == 'buy']
+                        cur_price = tickers.get(sym, {}).get('last', 0) if tickers else 0
+                        
+                        report += f"💎 **{sym}** | Price: {cur_price}\n"
+                        
+                        if pos:
+                            total_amount = sum(p['amount'] for p in pos)
+                            avg_p = sum(p['buy_price'] * p['amount'] for p in pos) / total_amount if total_amount > 0 else 0
+                            pnl = (cur_price/avg_p - 1)*100 if avg_p > 0 else 0
+                            report += f"   • Avg Entry: {avg_p:.4f} ({pnl:+.2f}%)\n"
+                            
+                            report += f"   • Bought Levels:\n"
+                            for p_item in sorted(pos, key=lambda x: x['level']):
+                                report += f"     - Lvl {p_item['level']} @ {p_item['buy_price']}\n"
+
+                        else:
+                            report += f"   • Avg Entry: None\n"
+                        
+                        if limits:
+                            report += f"   • Active Limits:\n"
+                            for l in sorted(limits, key=lambda x: x['level']):
+                                report += f"     - Lvl {l['level']} @ {l['price']}\n"
+                        else:
+                            report += f"   • Active Limits: None\n"
+                        report += "\n"
+                    send_telegram(report)
+    except Exception:
+        pass
+
 def main():
     global SYMBOLS, TOTAL_BUDGET
     exchange = ccxt.binance({
@@ -99,6 +146,7 @@ def main():
     SYMBOLS = raw_symbols.split(',') if raw_symbols else []
     TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT', 0))
 
+    last_update_id = [0]
     send_telegram(f"🚀 Aggressor (Cascade) started! Symbols: {', '.join(SYMBOLS)}. Budget: {TOTAL_BUDGET}$")
 
     while True:
@@ -144,6 +192,9 @@ def main():
             except Exception:
                 time.sleep(5)
                 continue
+
+            # Handle Telegram commands without blocking the loop
+            handle_telegram_commands(active_orders, tickers, DROP_STEPS, last_update_id)
 
             for symbol in SYMBOLS:
                 if symbol in blacklisted_symbols:

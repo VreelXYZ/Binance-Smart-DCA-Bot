@@ -126,8 +126,8 @@ def main():
                         # ALL CONDITIONS MET
                         msg = (
                             f"🚨 RADAR: Pump Initiating!\n"
-                            f"🪙 Coin: {symbol}\n"
-                            f"📊 Volume jumped {vol_multiplier:.1f}x!\n"
+                            f"💎 Coin: {symbol}\n"
+                            f"� Volume jumped {vol_multiplier:.1f}x!\n"
                             f"📈 5 min growth: +{growth_5m:.2f}%\n"
                             f"🕒 Overall growth (24h): +{change_24h:.2f}%"
                         )
