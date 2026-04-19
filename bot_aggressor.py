@@ -82,8 +82,15 @@ def main():
         'apiKey': API_KEY,
         'secret': SECRET_KEY,
         'enableRateLimit': True,
-        'options': {'adjustForTimeDifference': True}
+        'options': {
+            'adjustForTimeDifference': True,
+            'recvWindow': 10000
+        }
     })
+    
+    # Sync local time with Binance server time to avoid timestamp errors
+    exchange.load_time_difference()
+    
     exchange.load_markets()
     active_orders = load_orders()
 
@@ -244,6 +251,10 @@ def main():
                                     'price': safe_price, 'amount': so_amount
                                 }
                             save_orders(active_orders)
+                    except ccxt.OrderNotFound as e:
+                        print(f"Order {oid} for {symbol} not found on exchange. Cleaning up local tracker.")
+                        del active_orders[oid]
+                        save_orders(active_orders)
                     except Exception as e:
                         print(f"Error checking limit order {symbol}: {e}")
 
