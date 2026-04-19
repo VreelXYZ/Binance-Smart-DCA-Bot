@@ -63,7 +63,7 @@ Both strategies are built upon a resilient, high-performance core:
 1.  **Independent Trailing Take Profit**: Every DCA level (Base and all Safety Orders) tracks the price upwards independently. The bot doesn't just sell at a fixed percentage; it rides the trend until exhaustion.
 2.  **Volume Filter (Bull Trap Shield)**: Before any entry, the bot analyzes the **5-minute Taker Volume**. It only enters when buying pressure significantly outweighs selling pressure.
 3.  **Dynamic Cascade Re-Entry**: When a safety level is sold, the bot dynamically re-places the entry order based on the actual sale price, maintaining mathematical grid integrity without overlap.
-4.  **Auto Grid Restoration (Hole Shield)**: On startup or during execution, the bot automatically detects missing grid levels (e.g. after a crash or restart). It repairs the grid with Limit orders, preventing slippage even if the price is already below the target.
+4.  **Auto Grid Restoration & Phantom Order Cleanup**: On startup or during execution, if a limit order is manually canceled on the exchange or lost, the bot detects the missing order (`OrderNotFound`), clears it from local memory, and seamlessly repairs the grid hole by calculating and placing a new limit order at the exact required level.
 5.  **Market Cooling & Hot Reload**: After a Base Sale, the bot enters "Radar Mode" to prevent FOMO. Update symbols, budget, or emergency exits in `.env` instantly without restart.
 
 ---
