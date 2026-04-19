@@ -4,29 +4,13 @@ import os
 import requests
 import ccxt
 from dotenv import load_dotenv
+from tg_utils import TelegramManager
 
 # Load environment variables
 load_dotenv()
 
-# Fetch Telegram configuration (Aggressor only)
-TG_TOKEN = os.getenv("AGGRESSOR_TG_TOKEN")
-TG_CHAT_ID = os.getenv("AGGRESSOR_TG_CHAT_ID")
-
-def send_telegram_message(message):
-    """Sends a notification to the specified Telegram channel/user."""
-    if not TG_TOKEN or not TG_CHAT_ID:
-        print("Telegram configuration is missing. Cannot send message.")
-        return
-    url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TG_CHAT_ID,
-        "text": message
-    }
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        response.raise_for_status()
-    except Exception as e:
-        print(f"Failed to send telegram message: {e}")
+tg = TelegramManager("AGGRESSOR_TG_TOKEN", "AGGRESSOR_TG_CHAT_ID")
+send_telegram_message = tg.send_message
 
 def main():
     print("Radar successfully started. Scanning markets...")

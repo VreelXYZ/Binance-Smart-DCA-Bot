@@ -4,6 +4,7 @@ import json
 import os
 import requests
 from dotenv import load_dotenv
+from tg_utils import TelegramManager
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(current_dir, '.env'), override=True)
@@ -11,8 +12,10 @@ load_dotenv(os.path.join(current_dir, '.env'), override=True)
 API_KEY = os.getenv('BINANCE_API_KEY')
 SECRET_KEY = os.getenv('BINANCE_SECRET_KEY')
 FILE_NAME = os.path.join(current_dir, 'multi_orders.json')
-TG_TOKEN = os.getenv('TG_TOKEN')
-TG_CHAT_ID = os.getenv('TG_CHAT_ID')
+
+tg = TelegramManager('TG_TOKEN', 'TG_CHAT_ID')
+send_telegram = tg.send_message
+handle_telegram_commands = tg.handle_commands
 
 # --- CONSERVATOR SETTINGS ---
 raw_symbols = os.getenv('CONSERVATOR_SYMBOLS', '').replace(' ', '')
@@ -33,13 +36,6 @@ DROP_STEPS = [0.004, 0.004, 0.006, 0.008, 0.010]
 blacklisted_symbols = set() # Store symbols here after exit
 cooldown_data = {} # symbol -> {'expire_time': timestamp, 'sale_price': price}
 entry_check_timers = {} # symbol -> timestamp (15 sec entry check delay)
-
-def send_telegram(text):
-    try:
-        url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-        requests.post(url, data={"chat_id": TG_CHAT_ID, "text": text}, timeout=10)
-    except Exception as e:
-        print(f"TG Error: {e}")
 
 def save_orders(orders):
     with open(FILE_NAME, 'w') as f:
@@ -76,53 +72,6 @@ def cancel_all_for_symbol(exchange, active_orders, symbol):
         active_orders.pop(k, None)
     save_orders(active_orders)
 
-def handle_telegram_commands(active_orders, tickers, drop_steps, update_id_container):
-    try:
-        url = f"https://api.telegram.org/bot{TG_TOKEN}/getUpdates"
-        res = requests.get(url, params={'offset': update_id_container[0] + 1}, timeout=1).json()
-        if res.get('ok') and res.get('result'):
-            for update in res['result']:
-                update_id_container[0] = update['update_id']
-                msg = update.get('message', {})
-                if str(msg.get('chat', {}).get('id')) == str(TG_CHAT_ID) and msg.get('text') == '/status':
-                    report = "📊 **STATUS REPORT**\n\n"
-                    active_syms = set(v['symbol'] for v in active_orders.values())
-                    if not active_syms:
-                        send_telegram(report + "No active positions or orders.")
-                        continue
-                    
-                    for sym in active_syms:
-                        s_ords = [v for v in active_orders.values() if v['symbol'] == sym]
-                        pos = [p for p in s_ords if p['side'] == 'position']
-                        limits = [l for l in s_ords if l['side'] == 'buy']
-                        cur_price = tickers.get(sym, {}).get('last', 0) if tickers else 0
-                        
-                        report += f"💎 **{sym}** | Price: {cur_price}\n"
-                        
-                        if pos:
-                            total_amount = sum(p['amount'] for p in pos)
-                            avg_p = sum(p['buy_price'] * p['amount'] for p in pos) / total_amount if total_amount > 0 else 0
-                            pnl = (cur_price/avg_p - 1)*100 if avg_p > 0 else 0
-                            report += f"   • Avg Entry: {avg_p:.4f} ({pnl:+.2f}%)\n"
-
-                            report += f"   • Bought Levels:\n"
-                            for p_item in sorted(pos, key=lambda x: x['level']):
-                                report += f"     - Lvl {p_item['level']} @ {p_item['buy_price']}\n"
-
-                        else:
-                            report += f"   • Avg Entry: None\n"
-                        
-                        if limits:
-                            report += f"   • Active Limits:\n"
-                            for l in sorted(limits, key=lambda x: x['level']):
-                                report += f"     - Lvl {l['level']} @ {l['price']}\n"
-                        else:
-                            report += f"   • Active Limits: None\n"
-                        report += "\n"
-                    send_telegram(report)
-    except Exception:
-        pass
-
 def main():
     global SYMBOLS, TOTAL_BUDGET
     exchange = ccxt.binance({
@@ -147,7 +96,20 @@ def main():
     TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT_CONSERVATOR', 0))
 
     last_update_id = [0]
-    send_telegram(f"🚀 Conservator (Cascade) started! Symbols: {', '.join(SYMBOLS)}. Budget: {TOTAL_BUDGET}$")
+    welcome_text = (
+        f"🚀 *Conservator (Cascade) started!*\n"
+        f"Symbols: {', '.join(SYMBOLS)} | Budget: {TOTAL_BUDGET}$\n\n"
+        f"If this tool helps you earn, please consider supporting further development and rigorous testing. Every bit helps!\n\n"
+        f"USDT (BEP20): `0x213d642eca4cb68731e61a6e4716deb5882c4364`\n"
+        f"Binance ID: `498092588`\n"
+        f"_(Tap to copy)_"
+    )
+    keyboard = {
+        "inline_keyboard": [[
+            {"text": "💳 Open Binance Pay", "url": "https://www.binance.com/en/my/payment/send"}
+        ]]
+    }
+    send_telegram(welcome_text, reply_markup=keyboard)
 
     while True:
         try:
@@ -290,6 +252,10 @@ def main():
                         print(f"Order {oid} for {symbol} not found on exchange. Cleaning up local tracker.")
                         del active_orders[oid]
                         save_orders(active_orders)
+                    except ccxt.NetworkError:
+                        pass  # Временный сетевой сбой, тихо повторяем попытку на следующем круге
+                    except ccxt.InvalidNonce:
+                        exchange.load_time_difference()  # Синхронизируем время, если оно рассинхронизировалось
                     except Exception as e:
                         print(f"Error checking limit order {symbol}: {e}")
 

@@ -6,6 +6,8 @@ Tired of staring at charts or missing perfect entries during market swings? **Bo
 
 This suite features two distinct algorithmic powerhouses, allowing you to switch between **Capital Preservation** and **Aggressive Growth** depending on market volatility.
 
+**If you find this bot useful, please give this repository a Star on GitHub ⭐️! It's just one click for you, but a huge motivation for me to keep pushing updates!**
+
 ---
 
 ## 🛠 Choose Your Strategy
