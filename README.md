@@ -58,12 +58,12 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 
 Both strategies are built upon a resilient, high-performance core:
 
-1.  **Independent Trailing Take Profit**: Every DCA level (Base and all Safety Orders) tracks the price upwards independently. The bot doesn't just sell at a fixed percentage; it rides the trend until exhaustion.
-2.  **Volume Filter (Bull Trap Shield)**: Before any entry, the bot analyzes the **5-minute Taker Volume**. It only enters when buying pressure significantly outweighs selling pressure.
-3.  **Dynamic Cascade Re-Entry**: When a safety level is sold, the bot dynamically re-places the entry order based on the actual sale price, maintaining mathematical grid integrity without overlap.
-4.  **Auto Grid Restoration & Phantom Order Cleanup**: On startup or during execution, if a limit order is manually canceled on the exchange or lost, the bot detects the missing order (`OrderNotFound`), clears it from local memory, and seamlessly repairs the grid hole by calculating and placing a new limit order at the exact required level.
-5.  **Market Cooling & Hot Reload**: After a Base Sale, the bot enters "Radar Mode" to prevent FOMO. Update symbols, budget, or emergency exits in `.env` instantly without restart.
-6.  **Live Status Reporting via Telegram**: Get a detailed, real-time report of all active positions by sending the `/status` command to the bot. The report includes average entry price, PNL, bought levels, and active limit orders for each symbol.
+1.  **Advanced Trailing Logic**: Depending on the strategy, the bot either tracks each level independently (Aggressor) or trails the true average of the entire basket (Conservator), always riding the trend to maximize profit instead of using fixed targets.
+2.  **Volume Filter (Bull Trap Shield)**: Before any entry, the bots analyze the **5-minute Taker Volume**. They only enter when buying pressure significantly outweighs selling pressure.
+3.  **Auto Grid Restoration & Phantom Order Cleanup**: If a limit order is manually canceled on the exchange or lost, the bots detect the missing order (`OrderNotFound`), clear it from memory, and seamlessly repair the grid hole by calculating and placing a new limit order at the exact required level.
+4.  **Market Cooling (Radar Mode)**: After a successful exit, the bots enter a cooldown phase, waiting for a localized dip or time expiry before re-entering to prevent FOMO buying at the local top.
+5.  **Hot Reload & Emergency Exits**: Update symbols, budget, or move coins to the EXIT list in `.env` on the fly. The bot reads changes instantly without needing a restart.
+6.  **Live Status Reporting via Telegram**: Get a detailed, real-time report of all active positions by sending the `/status` command. The report includes average entry price, PNL, bought levels, active limit orders, and accumulated profit for each symbol.
 
 ---
 
