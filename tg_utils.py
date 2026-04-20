@@ -31,7 +31,7 @@ class TelegramManager:
         except Exception as e:
             print(f"TG Error: {e}")
 
-    def handle_commands(self, active_orders, tickers, drop_steps, update_id_container):
+    def handle_commands(self, exchange, active_orders, tickers, drop_steps, update_id_container):
         if not self.token or not self.chat_id:
             return
         try:
@@ -42,7 +42,14 @@ class TelegramManager:
                     update_id_container[0] = update['update_id']
                     msg = update.get('message', {})
                     if str(msg.get('chat', {}).get('id')) == str(self.chat_id) and msg.get('text') == '/status':
-                        report = "📊 *STATUS REPORT*\n\n"
+                        report = "📊 *STATUS REPORT*\n"
+                        try:
+                            balance = exchange.fetch_free_balance()
+                            free_usdt = balance.get('USDT', 0)
+                            report += f"💵 *Free USDT:* {free_usdt:.2f}\n\n"
+                        except Exception:
+                            report += f"💵 *Free USDT:* Error fetching\n\n"
+                            
                         active_syms = set(v['symbol'] for v in active_orders.values())
                         if not active_syms:
                             self.send_message(report + "No active positions or orders.")
@@ -56,10 +63,19 @@ class TelegramManager:
                             
                             report += f"💎 *{sym}* | Price: {cur_price}\n"
                             
+                            profit_data = active_orders.get(f"profit_{sym}", {})
+                            total_profit = profit_data.get('total_usdt', 0.0)
+                            if total_profit != 0:
+                                report += f"   • Total Profit: 🏆 {total_profit:.2f} USDT\n"
+                                
                             if pos:
                                 total_amount = sum(p['amount'] for p in pos)
-                                avg_p = sum(p['buy_price'] * p['amount'] for p in pos) / total_amount if total_amount > 0 else 0
+                                
+                                invested_usdt = sum(p['buy_price'] * p['amount'] for p in pos)
+                                avg_p = invested_usdt / total_amount if total_amount > 0 else 0
+                                    
                                 pnl = (cur_price/avg_p - 1)*100 if avg_p > 0 else 0
+                                report += f"   • Invested: {invested_usdt:.2f} USDT\n"
                                 report += f"   • Avg Entry: {avg_p:.4f} ({pnl:+.2f}%)\n"
                                 report += f"   • Bought Levels:\n"
                                 for p_item in sorted(pos, key=lambda x: x['level']):
