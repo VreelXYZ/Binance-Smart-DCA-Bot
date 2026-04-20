@@ -67,7 +67,6 @@ def cancel_all_for_symbol(exchange, active_orders, symbol):
         exchange.cancel_all_orders(symbol)
     except Exception:
         pass
-    # Удаляем все ордера, кроме накопительного счетчика профита
     keys_to_delete = [k for k, v in active_orders.items() if v['symbol'] == symbol and v.get('side') != 'profit']
     for k in keys_to_delete:
         active_orders.pop(k, None)

@@ -2,7 +2,6 @@ import ccxt
 import time
 import json
 import os
-import requests
 from dotenv import load_dotenv
 from tg_utils import TelegramManager
 
@@ -22,16 +21,20 @@ raw_symbols = os.getenv('CONSERVATOR_SYMBOLS', '').replace(' ', '')
 SYMBOLS = raw_symbols.split(',') if raw_symbols else []
 TOTAL_BUDGET = float(os.getenv('TOTAL_BUDGET_USDT_CONSERVATOR', 0))
 
-# 5 safety levels (total 6 orders including Base)
-BASE_PCT = 0.20   # 20% budget for Base
-SAFETY_PCT = 0.16 # 16% for each of 5 safety orders (80% total)
-
-# Elastic buy steps: tight at the top, wide at the bottom
-DROP_STEPS = [0.004, 0.004, 0.006, 0.008, 0.010] 
-
-# Sensitive trailing settings:
-# Lvl 0: +1.0% trigger, -0.3% callback
-# Lvl 1-5: +0.55% trigger, -0.15% (for ~0.4% net profit)
+# Dynamic grid settings (Levels 0 to 10)
+GRID_CONFIG = {
+    0: {'drop': 0.000, 'pct': 0.025},  # 2.5%
+    1: {'drop': 0.005, 'pct': 0.050},  # 5.0%
+    2: {'drop': 0.005, 'pct': 0.050},  # 5.0%
+    3: {'drop': 0.005, 'pct': 0.050},  # 5.0%
+    4: {'drop': 0.010, 'pct': 0.085},  # 8.5%
+    5: {'drop': 0.010, 'pct': 0.085},  # 8.5%
+    6: {'drop': 0.010, 'pct': 0.085},  # 8.5%
+    7: {'drop': 0.015, 'pct': 0.135},  # 13.5%
+    8: {'drop': 0.015, 'pct': 0.135},  # 13.5%
+    9: {'drop': 0.015, 'pct': 0.135},  # 13.5%
+    10: {'drop': 0.020, 'pct': 0.165}, # 16.5%
+}
 
 blacklisted_symbols = set() # Store symbols here after exit
 cooldown_data = {} # symbol -> {'expire_time': timestamp, 'sale_price': price}
@@ -67,11 +70,21 @@ def cancel_all_for_symbol(exchange, active_orders, symbol):
         exchange.cancel_all_orders(symbol)
     except Exception:
         pass
-    # Удаляем все ордера, кроме накопительного счетчика профита
     keys_to_delete = [k for k, v in active_orders.items() if v['symbol'] == symbol and v.get('side') != 'profit']
     for k in keys_to_delete:
         active_orders.pop(k, None)
     save_orders(active_orders)
+
+def cancel_all_sell_orders(exchange, symbol):
+    """Cancels all limit sell orders for a symbol to free up balance"""
+    try:
+        open_orders = exchange.fetch_open_orders(symbol)
+        for order in open_orders:
+            if order['side'] == 'sell':
+                exchange.cancel_order(order['id'], symbol)
+                print(f"Cancelled limit sell order {order['id']} for {symbol}")
+    except Exception as e:
+        print(f"Error cancelling sell orders for {symbol}: {e}")
 
 def main():
     global SYMBOLS, TOTAL_BUDGET
@@ -98,8 +111,8 @@ def main():
 
     last_update_id = [0]
     welcome_text = (
-        f"🚀 *Conservator (Cascade) started!*\n"
-        f"Symbols: {', '.join(SYMBOLS)} | Budget: {TOTAL_BUDGET}$\n\n"
+        f"🚀 *Conservator (Global DCA Swing) started!*\n"
+        f"Symbols: {', '.join(SYMBOLS)}\n\n"
         f"If this tool helps you earn, please consider supporting further development and rigorous testing. Every bit helps!\n\n"
         f"USDT (BEP20): `0x213d642eca4cb68731e61a6e4716deb5882c4364`\n"
         f"Binance ID: `498092588`\n"
@@ -166,7 +179,7 @@ def main():
                 continue
 
             # Handle Telegram commands without blocking the loop
-            handle_telegram_commands(exchange, active_orders, tickers, DROP_STEPS, last_update_id)
+            handle_telegram_commands(exchange, active_orders, tickers, None, last_update_id)
 
             for symbol in SYMBOLS:
                 if symbol in blacklisted_symbols:
@@ -195,7 +208,7 @@ def main():
                     entry_check_timers[symbol] = time.time() + 15
 
                     if is_buyers_market(exchange, symbol):
-                        base_usdt = TOTAL_BUDGET * BASE_PCT
+                        base_usdt = TOTAL_BUDGET * GRID_CONFIG[0]['pct']
                         amount_coin = float(exchange.amount_to_precision(symbol, base_usdt / current_price))
                         try:
                             order = exchange.create_market_buy_order(symbol, amount_coin)
@@ -205,8 +218,7 @@ def main():
                             pos_id = f"pos_{symbol}_0_{int(time.time())}"
                             active_orders[pos_id] = {
                                 'symbol': symbol, 'side': 'position', 'level': 0,
-                                'buy_price': exec_price, 'amount': amount_coin,
-                                'trailing': False, 'high_watermark': exec_price
+                                'buy_price': exec_price, 'amount': amount_coin
                             }
                             active_orders[f"meta_{symbol}"] = {
                                 'symbol': symbol, 'side': 'meta', 'real_avg': exec_price
@@ -214,9 +226,9 @@ def main():
                             send_telegram(f"🔥 {symbol}: BASE BOUGHT (Lvl 0) at {exec_price}")
                             
                             # Place limit order for level 1
-                            buy_limit_price = exec_price * (1 - DROP_STEPS[0])
+                            buy_limit_price = exec_price * (1 - GRID_CONFIG[1]['drop'])
                             safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
-                            so_usdt = TOTAL_BUDGET * SAFETY_PCT
+                            so_usdt = TOTAL_BUDGET * GRID_CONFIG[1]['pct']
                             so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
                             
                             l_order = exchange.create_limit_buy_order(symbol, so_amount, safe_price)
@@ -229,7 +241,7 @@ def main():
                             print(f"Error buying base {symbol}: {e}")
                     continue
 
-                # --- 2. CHECKING EXECUTION OF SAFETY ORDERS (LEVELS 1-5) ---
+                # --- 2. CHECKING EXECUTION OF SAFETY ORDERS ---
                 for oid, l_data in list(limit_buys.items()):
                     try:
                         info = exchange.fetch_order(oid, symbol)
@@ -241,24 +253,26 @@ def main():
                             pos_id = f"pos_{symbol}_{lvl}_{int(time.time())}"
                             active_orders[pos_id] = {
                                 'symbol': symbol, 'side': 'position', 'level': lvl,
-                                'buy_price': exec_price, 'amount': l_data['amount'],
-                                'trailing': False, 'high_watermark': exec_price
+                                'buy_price': exec_price, 'amount': l_data['amount']
                             }
                             send_telegram(f"📉 {symbol}: Safety order triggered (Lvl {lvl}) at {exec_price}")
                             del active_orders[oid]
                             
+                            # Recalculate and save true average
                             current_positions = [v for v in active_orders.values() if v['symbol'] == symbol and v['side'] == 'position']
                             t_cost = sum(p['buy_price'] * p['amount'] for p in current_positions)
                             t_amount = sum(p['amount'] for p in current_positions)
                             if t_amount > 0:
-                                active_orders[f"meta_{symbol}"] = {'symbol': symbol, 'side': 'meta', 'real_avg': t_cost / t_amount}
+                                if f"meta_{symbol}" not in active_orders:
+                                    active_orders[f"meta_{symbol}"] = {'symbol': symbol, 'side': 'meta'}
+                                active_orders[f"meta_{symbol}"]['real_avg'] = t_cost / t_amount
                             
-                            # Place next safety order (up to level 5)
-                            if lvl < 5:
+                            # Place next safety order if within standard levels 1-10
+                            if lvl < 10:
                                 next_lvl = lvl + 1
-                                buy_limit_price = exec_price * (1 - DROP_STEPS[lvl]) # Relative to current level price
+                                buy_limit_price = exec_price * (1 - GRID_CONFIG[next_lvl]['drop']) # Relative to current level price
                                 safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
-                                so_usdt = TOTAL_BUDGET * SAFETY_PCT
+                                so_usdt = TOTAL_BUDGET * GRID_CONFIG[next_lvl]['pct']
                                 so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
                                 
                                 new_order = exchange.create_limit_buy_order(symbol, so_amount, safe_price)
@@ -278,110 +292,91 @@ def main():
                     except Exception as e:
                         print(f"Error checking limit order {symbol}: {e}")
 
-                # --- 3. INDEPENDENT TRAILING PROFIT (SELL) ---
-                for pid, p_data in list({k:v for k,v in active_orders.items() if v['side'] == 'position' and v['symbol'] == symbol}.items()):
-                    b_price = p_data['buy_price']
-                    lvl = p_data['level']
+                # --- 3. GLOBAL TRAILING PROFIT (SELL ALL) ---
+                if positions:
+                    meta_key = f"meta_{symbol}"
+                    meta = active_orders.get(meta_key)
                     
-                    trigger_pct = 0.010 if lvl == 0 else 0.006
-                    callback_pct = 0.003 if lvl == 0 else 0.002
-                    floor_pct = trigger_pct - 0.0005
+                    if meta and 'real_avg' in meta:
+                        avg_price = meta['real_avg']
+                    else:
+                        t_cost = sum(p['buy_price'] * p['amount'] for p in positions.values())
+                        t_amount = sum(p['amount'] for p in positions.values())
+                        avg_price = t_cost / t_amount if t_amount > 0 else 0
+                        
+                        if meta_key not in active_orders:
+                            active_orders[meta_key] = {'symbol': symbol, 'side': 'meta'}
+                        active_orders[meta_key]['real_avg'] = avg_price
+                        save_orders(active_orders)
+                        meta = active_orders[meta_key]
+                        
+                    if 'trailing' not in meta:
+                        meta['trailing'] = False
+                        meta['high_watermark'] = 0.0
                     
-                    if not p_data['trailing']:
-                        # Activate trailing
-                        if current_price >= b_price * (1 + trigger_pct):
-                            p_data['trailing'] = True
-                            p_data['high_watermark'] = current_price
+                    if not meta['trailing']:
+                        # Target activation: current_price >= avg_price * 1.038
+                        if avg_price > 0 and current_price >= avg_price * 1.038:
+                            meta['trailing'] = True
+                            meta['high_watermark'] = current_price
+                            active_orders[meta_key] = meta
                             
-                            min_sell_price = b_price * (1 + floor_pct)
-                            proj_gross = (min_sell_price - b_price) * p_data['amount']
-                            proj_fee = (b_price * p_data['amount'] * 0.00075) + (min_sell_price * p_data['amount'] * 0.00075)
-                            proj_net = proj_gross - proj_fee
-                            
-                            send_telegram(f"🎯 {symbol}: Trailing activated for (Lvl {lvl}). Min profit secured: {floor_pct*100:.2f}% (~{proj_net:.2f} USDT)")
+                            proj_gross = (current_price - avg_price) * t_amount
+                            send_telegram(f"🎯 {symbol}: GLOBAL Trailing activated! Avg Price: {avg_price:.4f}, Current: {current_price:.4f}. Securing profit (~{proj_gross:.2f} USDT)...")
                             save_orders(active_orders)
                     else:
-                        hw = p_data['high_watermark']
+                        hw = meta.get('high_watermark', current_price)
                         if current_price > hw:
-                            p_data['high_watermark'] = current_price
+                            meta['high_watermark'] = current_price
+                            active_orders[meta_key] = meta
                             save_orders(active_orders)
                         else:
-                            sell_threshold = max(hw * (1 - callback_pct), b_price * (1 + floor_pct))
+                            # Trailing stop: If current_price <= max_price * 0.992 (0.8% callback)
+                            sell_threshold = hw * 0.992
                             if current_price <= sell_threshold:
-                                # Execute Sale
                                 try:
-                                    sell_order = exchange.create_market_sell_order(symbol, p_data['amount'])
-                                    actual_sell_price = sell_order.get('average') or current_price
-                                    profit_pct = ((actual_sell_price - b_price) / b_price) * 100
+                                    # Just to be absolutely sure no locked balance exists
+                                    cancel_all_sell_orders(exchange, symbol)
                                     
-                                    actual_gross = (actual_sell_price - b_price) * p_data['amount']
-                                    actual_fee = (b_price * p_data['amount'] * 0.00075) + (actual_sell_price * p_data['amount'] * 0.00075)
-                                    actual_net = actual_gross - actual_fee
+                                    base_coin = symbol.split('/')[0]
+                                    balance = exchange.fetch_free_balance()
+                                    coin_balance = balance.get(base_coin, 0)
                                     
-                                    profit_key = f"profit_{symbol}"
-                                    if profit_key not in active_orders:
-                                        active_orders[profit_key] = {'symbol': symbol, 'side': 'profit', 'total_usdt': 0.0}
-                                    active_orders[profit_key]['total_usdt'] += actual_net
-                                    total_coin_profit = active_orders[profit_key]['total_usdt']
-                                    
-                                    send_telegram(f"✅ {symbol}: SOLD (Lvl {lvl}) at {actual_sell_price}!\nTrade Profit: +{profit_pct:.2f}% (💰 {actual_net:.2f} USDT)\nTotal {symbol} Profit: 🏆 {total_coin_profit:.2f} USDT")
-                                
-                                    del active_orders[pid]
-                                
-                                    # CASCADE RE-ENTRY LOGIC
-                                    if lvl == 0:
-                                        # Base sold -> reset entire grid for this symbol
-                                        cancel_all_for_symbol(exchange, active_orders, symbol)
-                                        send_telegram(f"♻️ {symbol}: Base sold. Grid reset, waiting for new entry.")
-                                        send_telegram("⏳ Cooling down: 5 minutes or 1% drop...")
-                                        cooldown_data[symbol] = {
-                                            'expire_time': time.time() + 300,
-                                            'sale_price': actual_sell_price
-                                        }
+                                    amount_to_sell = float(exchange.amount_to_precision(symbol, coin_balance))
+                                    if amount_to_sell > 0:
+                                        sell_order = exchange.create_market_sell_order(symbol, amount_to_sell)
+                                        actual_sell_price = sell_order.get('average') or current_price
+                                        
+                                        profit_pct = ((actual_sell_price - avg_price) / avg_price) * 100
+                                        actual_gross = (actual_sell_price - avg_price) * amount_to_sell
+                                        
+                                        profit_key = f"profit_{symbol}"
+                                        if profit_key not in active_orders:
+                                            active_orders[profit_key] = {'symbol': symbol, 'side': 'profit', 'total_usdt': 0.0}
+                                        active_orders[profit_key]['total_usdt'] += actual_gross
+                                        total_coin_profit = active_orders[profit_key]['total_usdt']
+                                        
+                                        send_telegram(f"✅ {symbol}: GLOBAL SWING SOLD at {actual_sell_price}!\nTrade Profit: +{profit_pct:.2f}% (💰 {actual_gross:.2f} USDT)\nTotal {symbol} Profit: 🏆 {total_coin_profit:.2f} USDT")
                                     else:
-                                        # Safety level sold -> cancel subsequent level and re-place current level
-                                        next_lvl = lvl + 1
-                                        for oid, l_data in list(active_orders.items()):
-                                            if l_data['symbol'] == symbol and l_data['side'] == 'buy' and l_data['level'] == next_lvl:
-                                                try:
-                                                    exchange.cancel_order(oid, symbol)
-                                                    del active_orders[oid]
-                                                except: pass
+                                        send_telegram(f"⚠️ {symbol}: Tried to global sell but balance was 0!")
                                     
-                                        # Dynamic re-entry for the sold level N
-                                        step_index = lvl - 1 if lvl > 0 else 0
+                                    # Clean up entire grid for the symbol
+                                    cancel_all_for_symbol(exchange, active_orders, symbol)
                                     
-                                        # Ensure we don't overlap grids by putting the grid above the previous level
-                                        prev_lvl_buy_price = None
-                                        for oid, v in list(active_orders.items()):
-                                            if v['symbol'] == symbol and v['side'] == 'position' and v['level'] == lvl - 1:
-                                                prev_lvl_buy_price = v['buy_price']
-                                                break
-                                    
-                                        reference_price = actual_sell_price
-                                        if prev_lvl_buy_price is not None:
-                                            reference_price = min(actual_sell_price, prev_lvl_buy_price)
-
-                                        buy_limit_price = reference_price * (1 - DROP_STEPS[step_index])
-                                        safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
-                                    
-                                        so_usdt = TOTAL_BUDGET * SAFETY_PCT
-                                        so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
-                                        new_order = exchange.create_limit_buy_order(symbol, so_amount, safe_price)
-                                        active_orders[new_order['id']] = {
-                                            'symbol': symbol, 'side': 'buy', 'level': lvl,
-                                            'price': safe_price, 'amount': so_amount
-                                        }
-                                        send_telegram(f"🔄 {symbol}: Re-placed entry for (Lvl {lvl}) at {safe_price} (following sale at {actual_sell_price}).")
-                                        save_orders(active_orders)
-
+                                    # Enter cooldown
+                                    cooldown_data[symbol] = {
+                                        'expire_time': time.time() + 300,
+                                        'sale_price': actual_sell_price if amount_to_sell > 0 else current_price
+                                    }
                                 except Exception as e:
-                                    print(f"Error selling {symbol}: {e}")
+                                    print(f"Error selling global {symbol}: {e}")
+                                    send_telegram(f"❌ Error during global sell for {symbol}: {e}")
 
-                # --- 4. GRID RESTORATION ---
+                # --- 4. GRID RESTORATION & CONTINUATION ---
                 if positions:
                     max_pos_lvl = max([p['level'] for p in positions.values()])
-                    if max_pos_lvl < 5:
+                    
+                    if max_pos_lvl < 10:
                         next_lvl = max_pos_lvl + 1
                         has_next_limit = any(l['level'] == next_lvl for l in limit_buys.values())
                         
@@ -389,11 +384,10 @@ def main():
                             prev_pos = [p for p in positions.values() if p['level'] == max_pos_lvl][0]
                             prev_buy_price = prev_pos['buy_price']
                             
-                            step_index = max_pos_lvl
-                            buy_limit_price = prev_buy_price * (1 - DROP_STEPS[step_index])
+                            buy_limit_price = prev_buy_price * (1 - GRID_CONFIG[next_lvl]['drop'])
                             safe_price = float(exchange.price_to_precision(symbol, buy_limit_price))
                             
-                            so_usdt = TOTAL_BUDGET * SAFETY_PCT
+                            so_usdt = TOTAL_BUDGET * GRID_CONFIG[next_lvl]['pct']
                             so_amount = float(exchange.amount_to_precision(symbol, so_usdt / safe_price))
                             
                             try:
@@ -401,7 +395,7 @@ def main():
                                     if current_price <= safe_price:
                                         send_telegram(f"🚨 {symbol}: Price already below missing Lvl {next_lvl} target ({safe_price})! Sending LIMIT order to buy immediately without slippage.")
                                     else:
-                                        send_telegram(f"⚠️ {symbol}: Hole in the grid detected. Setting missing Limit for Lvl {next_lvl} at {safe_price}.")
+                                        send_telegram(f"⚠️ {symbol}: Setting missing Limit for Lvl {next_lvl} at {safe_price}.")
                                         
                                     new_order = exchange.create_limit_buy_order(symbol, so_amount, safe_price)
                                     active_orders[new_order['id']] = {
