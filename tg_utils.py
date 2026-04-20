@@ -50,7 +50,10 @@ class TelegramManager:
                         except Exception:
                             report += f"💵 *Free USDT:* Error fetching\n\n"
                             
-                        active_syms = set(v['symbol'] for v in active_orders.values())
+                        active_syms = set(
+                            v['symbol'] for v in active_orders.values() 
+                            if (tickers and v['symbol'] in tickers) or v.get('side') in ('position', 'buy')
+                        )
                         if not active_syms:
                             self.send_message(report + "No active positions or orders.")
                             continue
