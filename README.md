@@ -14,39 +14,35 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 
 | Feature | 🛡️ The Conservator | 🔥 The Aggressor |
 | :--- | :--- | :--- |
-| **Market Focus** | Low-to-Medium Volatility | High Volatility & Deep Dips |
-| **Logic Priorirty** | Capital Protection & Steady Growth | Maximum Accumulation & "Moon" Trailing |
-| **Grid Depth** | **5 Safety Levels** (6 orders total) | **8 Safety Levels** (9 orders total) |
-| **Budget Split** | 20% Base / 16% per Safety Order | 20% Base / 10% per Safety Order |
-| **Entry Gaps** | Tight (0.4% - 1.0% steps) | **Expanding** (0.9% to 3.5% steps) |
-| **Trailing Profit** | **Hard Floor** (0.6% - 1.0%) | **Hard Floor** (0.95% - 1.95%) |
-| **Safety Net** | Shallow grid for quick profit resets | **-10% Stop-Loss** (~15.5% from Base entry) |
+| **Market Focus** | Low-to-Medium Volatility & Swings | High Volatility & Scalping |
+| **Logic Priority** | Global Basket Exit & Deep Averaging | Independent Levels & "Moon" Trailing |
+| **Grid Depth** | **10 Safety Levels** (11 orders total) | **8 Safety Levels** (9 orders total) |
+| **Budget Split** | Back-heavy (2.5% Base to 16.5% Max) | 20% Base / 10% per Safety Order |
+| **Entry Gaps** | Tight to Medium (0.5% - 2.0% steps) | **Expanding** (0.9% to 3.5% steps) |
+| **Trailing Profit** | **Global Target** (+3.8% Trigger / 0.8% Trail) | **Hard Floor** (0.95% - 1.95%) |
+| **Safety Net** | Deep 10-level grid, holds without Stop-Loss | **-10% Stop-Loss** (~15.5% from Base entry) |
 
 ---
 
 ### 🛡️ The Conservator (`bot_conservator.py`)
-*Designed for stability and compound growth.*
+*Designed for stability, deep averaging, and Global Swing exits.*
 
-*   **Quick Resets:** Tighter trailing targets ensure the bot exits positions quickly when a trend reverses, keeping capital liquid.
-*   **Elastic Grid:** Uses dynamic distancing between safety orders to optimize entry prices during minor pullbacks.
-*   **Sensitive Trailing:** 
-    *   **Base:** +1.0% trigger / 0.3% callback.
-    *   **Safety Orders:** +0.55% trigger / 0.15% callback (~0.4% net profit).
+*   **Global DCA Swing Logic:** Instead of selling individual levels, this bot calculates the True Average Entry price of the entire position. It waits for the whole basket to reach a profitable target before exiting everything at once.
+*   **Deep 10-Level Grid:** Employs a comprehensive 10-step safety grid to heavily average down the entry price during continuous market drops.
+*   **Back-heavy Budget Allocation:** Uses dynamic percentages (from 2.5% on the base up to 16.5% on the deepest levels), ensuring maximum capital is deployed at the best possible prices.
+*   **Global Trailing Profit:** 
+    *   **Trigger:** +3.8% from the True Average Entry.
+    *   **Callback:** 0.8% deviation from the local peak.
+*   **No Stop-Loss (Hold & Swing):** Relies purely on deep DCA logic to ride out volatility and eventually exit the entire position in profit, preventing realized losses on strong dumps.
 
-*   **Expanding Grid:** Covers a logarithmic price range (`[0.009, 0.009, 0.012, 0.015, 0.019, ... 0.035]`) to catch micro-jumps early and hold deep dumps later.
-*   **Protected Profit:** Protected trailing aims to secure at least **+0.9%** profit once triggered (subject to market slippage).
-*   **Full Capital Deployment:** Includes a hard Stop-Loss at **-10% from Average Entry Price** (protects up to a total ~15.5% dump).
-*   **Aggressive Hard Floor:**
-    *   **Level 0 (Base):** 1.95% trigger / 0.5% callback / **1.90% Floor**.
-    *   **Levels 1-8 (Safety):** 0.95% trigger / 0.3% callback / **0.90% Floor**.
+### 🔥 The Aggressor (`bot_aggressor.py`)
+*Designed for high-volatility scalping and rapid cascade execution.*
 
-### 🛡️ The Conservator (`bot_conservator.py`)
-*Designed for stability and rapid compounding.*
-
-*   **Quick Turnaround:** Tighter targets ensure capital stays liquid for the next opportunity.
-*   **Conservative Hard Floor:**
-    *   **Level 0 (Base):** 1.0% trigger / 0.3% callback / **0.95% Floor**.
-    *   **Levels 1-5 (Safety):** 0.6% trigger / 0.2% callback / **0.55% Floor**.
+*   **Independent Trailing:** Every single grid level is treated independently. The bot scales out of positions step-by-step as the price bounces.
+*   **Expanding Grid:** Covers a logarithmic price range (`[0.9%, 0.9%, 1.2%, ... 3.5%]`) to catch micro-jumps early and hold deep dumps later.
+*   **Hard Floor Profit:** Protected trailing secures at least +0.90% to +1.90% profit minimum once the initial targets are met.
+*   **Cascade Re-Entry:** When a lower level is sold, the bot dynamically recalculates and replaces the entry limit order from the exact sale price, riding the wave.
+*   **Emergency Stop-Loss:** Features a strict -10% hard stop-loss from the true average entry price to cut losses during catastrophic crashes.
 
 ### 📡 Market Scanner (`scanner.py`)
 *The "Bloodhound" Radar for finding pump candidates.*
