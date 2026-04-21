@@ -56,8 +56,8 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 ###  Market Scanner (`scanner.py`)
 *The High-Frequency "Bloodhound" Radar for finding instant pump momentum.*
 
-*   **Tape Dominance (1m):** Analyzes the live, forming 1-minute candle. Triggers only if Market Buys exceed Market Sells by $\ge$ 2.5x.
-*   **Order Book Support:** Scans the order book at 0.5% depth. The Buy Wall (Bids) must be $\ge$ 2x thicker than the Sell Wall (Asks).
+*   **Tape Dominance (1m):** Analyzes the live, forming 1-minute candle. Triggers only if Market Buys exceed Market Sells by $\ge$ 2.0x.
+*   **Order Book Support:** Scans the order book at 0.5% depth. The Buy Wall (Bids) must be $\ge$ 1.5x thicker than the Sell Wall (Asks).
 *   **Spread & Momentum Filter:** Rejects coins with a spread > 0.1% and requires a live price jump of $\ge$ 0.1%.
 *   **Hammer Integration:** Drops instantaneous signals into a local file for the Hammer bot to execute without API latency.
 
@@ -84,8 +84,8 @@ Both strategies are built upon a resilient, high-performance core:
 git clone https://github.com/VreelXYZ/Binance-Smart-DCA-Bot.git
 cd Binance-Smart-DCA-Bot
 
-# Install required libraries
-pip install ccxt python-dotenv requests
+# Install required libraries (including async/WebSocket support for Hammer Bot)
+pip install ccxt python-dotenv requests aiohttp websockets
 ```
 
 ### 2. Configuration (`.env`)

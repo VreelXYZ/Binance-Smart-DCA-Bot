@@ -155,8 +155,21 @@ async def main():
     # Clear signals file on startup
     open(SIGNALS_FILE, 'w').close() 
     
-    msg = f"🔨 *Hammer Bot Started*\nBudget: {BUDGET} USDT\nTotal Historical Profit: {total_hammer_profit:.2f} USDT\nWaiting for scanner signals..."
-    tg.send_message(msg)
+    welcome_text = (
+        f"🔨 *Hammer Bot Started*\n"
+        f"Budget: {BUDGET} USDT\n"
+        f"Total Historical Profit: {total_hammer_profit:.2f} USDT\n\n"
+        f"If this tool helps you earn, please consider supporting further development and rigorous testing. Every bit helps!\n\n"
+        f"USDT (BEP20): `0x213d642eca4cb68731e61a6e4716deb5882c4364`\n"
+        f"Binance ID: `498092588`\n"
+        f"_(Tap to copy)_"
+    )
+    keyboard = {
+        "inline_keyboard": [[
+            {"text": "💳 Open Binance Pay", "url": "https://www.binance.com/en/my/payment/send"}
+        ]]
+    }
+    tg.send_message(welcome_text, reply_markup=keyboard)
     print(f"Hammer running. Total Historical Profit: {total_hammer_profit:.2f} USDT. Waiting for signals...")
     
     while bot_active:

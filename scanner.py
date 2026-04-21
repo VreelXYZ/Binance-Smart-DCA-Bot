@@ -79,7 +79,7 @@ def main():
                     
                     # Condition 1: Tape Buy dominance (>= 2.5x)
                     if sell_vol <= 0: sell_vol = 0.0001
-                    if buy_vol < sell_vol * 2.5: continue
+                    if buy_vol < sell_vol * 2.0: continue
                     
                     deep_candidates.append((symbol, c_close, momentum, buy_vol, sell_vol))
                     time.sleep(0.05) # Rate limit safety
@@ -102,7 +102,7 @@ def main():
                     if ask_usdt <= 0: ask_usdt = 0.0001
                     
                     # Condition 2: Book Support (Bids >= 2x Asks)
-                    if bid_usdt >= ask_usdt * 2.0:
+                    if bid_usdt >= ask_usdt * 1.5:
                         match_found = True
                         print(f"🔥 EXACT MATCH: {symbol} | Tape: {buy_vol/sell_vol:.1f}x | Book: {bid_usdt/ask_usdt:.1f}x")
                         
