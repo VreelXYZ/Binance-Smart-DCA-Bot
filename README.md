@@ -12,15 +12,15 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 
 ## 🛠 Choose Your Strategy
 
-| Feature | 🛡️ The Conservator | 🔥 The Aggressor |
-| :--- | :--- | :--- |
-| **Market Focus** | Low-to-Medium Volatility & Swings | High Volatility & Scalping |
-| **Logic Priority** | Global Basket Exit & Deep Averaging | Independent Levels & "Moon" Trailing |
-| **Grid Depth** | **10 Safety Levels** (11 orders total) | **8 Safety Levels** (9 orders total) |
-| **Budget Split** | Back-heavy (2.5% Base to 16.5% Max) | 20% Base / 10% per Safety Order |
-| **Entry Gaps** | Tight to Medium (0.5% - 2.0% steps) | **Expanding** (0.9% to 3.5% steps) |
-| **Trailing Profit** | **Global Target** (+3.8% Trigger / 0.8% Trail) | **Hard Floor** (0.95% - 1.95%) |
-| **Safety Net** | Deep 10-level grid, holds without Stop-Loss | **-10% Stop-Loss** (~15.5% from Base entry) |
+| Feature | 🛡️ The Conservator | 🔥 The Aggressor | 🔨 The Hammer |
+| :--- | :--- | :--- | :--- |
+| **Market Focus** | Low Volatility & Swings | High Volatility & Cascades | Extreme Momentum & Micro-Scalps |
+| **Logic Priority** | Global Exit & Deep Averaging | Independent Levels Trailing | 100% In/Out & Step Trailing |
+| **Grid Depth** | **10 Safety Levels** | **8 Safety Levels** | **No Grid** (Single Order) |
+| **Budget Split** | Back-heavy (2.5% to 16.5%) | 20% Base / 10% Safety | 100% All-in per trade |
+| **Entry Logic** | 5m Taker Buy Dominance | 5m Taker Buy Dominance | Live 1m Tape, Book & Spread |
+| **Trailing Profit** | **Global** (+3.8% Trigger / 0.8% Trail) | **Hard Floor** (0.95% - 1.95%) | **Step Trailing** (+0.25% Ratchet) |
+| **Safety Net** | Holds without Stop-Loss | **-10% Stop-Loss** (From Avg) | **-0.22% Stop** (Daily limit: 3) |
 
 ---
 
@@ -44,13 +44,22 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 *   **Cascade Re-Entry:** When a lower level is sold, the bot dynamically recalculates and replaces the entry limit order from the exact sale price, riding the wave.
 *   **Emergency Stop-Loss:** Features a strict -10% hard stop-loss from the true average entry price to cut losses during catastrophic crashes.
 
-### 📡 Market Scanner (`scanner.py`)
-*The "Bloodhound" Radar for finding pump candidates.*
+### 🔨 The Hammer (`bot_hammer.py`)
+*Designed for lightning-fast WebSocket scalping and momentum riding.*
 
-*   **24h Guard:** Only scans coins with 0% to +15% daily growth to avoid buying at the absolute peak.
-*   **Volume Spike Detection:** Alerts when a 5-minute candle's volume is $\ge$ 3x the recent average.
-*   **Momentum Confirmation:** Requires a minimum +1.5% price jump within a single 5-minute candle.
-*   **Aggressor Integration:** Sends instant alerts to the Aggressor Telegram bot for manual or automated oversight.
+*   **100% In/Out Execution:** Trades the allocated budget in a single market order. No DCA grids or averaging.
+*   **Live WebSocket Tracking:** Connects to Binance via `ccxt.pro` WebSockets for millisecond-level price tracking.
+*   **Dynamic Step Trailing:** Base stop at -0.22%. As profit grows, the stop loss ratchets up in +0.25% steps (e.g., +0.50% profit moves the stop to +0.25%).
+*   **Daily Stop-Loss:** Automatically shuts down if it hits 3 consecutive stop-losses to protect capital during choppy markets.
+*   **Cumulative Profit Tracking:** Saves and reports overall bot profit locally and via Telegram after every trade.
+
+###  Market Scanner (`scanner.py`)
+*The High-Frequency "Bloodhound" Radar for finding instant pump momentum.*
+
+*   **Tape Dominance (1m):** Analyzes the live, forming 1-minute candle. Triggers only if Market Buys exceed Market Sells by $\ge$ 2.5x.
+*   **Order Book Support:** Scans the order book at 0.5% depth. The Buy Wall (Bids) must be $\ge$ 2x thicker than the Sell Wall (Asks).
+*   **Spread & Momentum Filter:** Rejects coins with a spread > 0.1% and requires a live price jump of $\ge$ 0.1%.
+*   **Hammer Integration:** Drops instantaneous signals into a local file for the Hammer bot to execute without API latency.
 
 ---
 
@@ -98,6 +107,13 @@ AGGRESSOR_SYMBOLS=SOL/USDT,BNB/USDT
 TOTAL_BUDGET_USDT=500
 AGGRESSOR_TG_TOKEN=your_tg_token_2
 AGGRESSOR_TG_CHAT_ID=your_chat_id_2
+
+# HAMMER & SCANNER CONFIG
+HAMMER_API_KEY=your_api_key_3
+HAMMER_SECRET_KEY=your_secret_key_3
+HAMMER_BUDGET_USDT=100
+HAMMER_TG_TOKEN=your_tg_token_3
+HAMMER_TG_CHAT_ID=your_chat_id_3
 ```
 
 ### 3. Execution
