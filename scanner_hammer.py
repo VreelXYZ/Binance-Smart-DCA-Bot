@@ -49,7 +49,7 @@ def main():
                 ask = tick.get('ask', 0)
                 if not bid or not ask or bid == 0: continue
                 spread = (ask - bid) / bid
-                if spread > 0.001: continue
+                if spread > 0.002: continue
                 
                 # Check Cooldown
                 if symbol in recent_signals and current_time - recent_signals[symbol] < COOLDOWN_SECONDS:
@@ -77,9 +77,9 @@ def main():
                     momentum = (c_close - c_open) / c_open
                     if momentum < 0.001: continue
                     
-                    # Condition 1: Tape Buy dominance (>= 2.5x)
+                    # Condition 1: Tape Buy dominance (>= 1.5x)
                     if sell_vol <= 0: sell_vol = 0.0001
-                    if buy_vol < sell_vol * 2.0: continue
+                    if buy_vol < sell_vol * 1.5: continue
                     
                     deep_candidates.append((symbol, c_close, momentum, buy_vol, sell_vol))
                     time.sleep(0.05) # Rate limit safety
@@ -101,8 +101,8 @@ def main():
                     
                     if ask_usdt <= 0: ask_usdt = 0.0001
                     
-                    # Condition 2: Book Support (Bids >= 2x Asks)
-                    if bid_usdt >= ask_usdt * 1.5:
+                    # Condition 2: Book Support (Bids >= 1.2x Asks)
+                    if bid_usdt >= ask_usdt * 1.2:
                         match_found = True
                         print(f"🔥 EXACT MATCH: {symbol} | Tape: {buy_vol/sell_vol:.1f}x | Book: {bid_usdt/ask_usdt:.1f}x")
                         
@@ -116,7 +116,7 @@ def main():
                             f"📈 *Momentum (1m):* +{momentum*100:.2f}%\n"
                             f"🛒 *Tape (Buys):* {buy_vol/sell_vol:.1f}x vs Sells\n"
                             f"🧱 *Book (Bids):* {bid_usdt/ask_usdt:.1f}x vs Asks\n"
-                            f"💸 *Spread:* < 0.1%"
+                            f"💸 *Spread:* < 0.2%"
                         )
                     time.sleep(0.05)
                 except Exception as e:
