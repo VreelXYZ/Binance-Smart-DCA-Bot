@@ -3,10 +3,10 @@ import time
 import sys
 
 def main():
-    print("🚀 Starting Hammer ecosystem: Scanner + Aggressor Bot")
+    print("🚀 Starting Hammer ecosystem: Scanner + Hammer Bot")
     
     # Start scanner and bot using the current Python executable
-    scanner_process = subprocess.Popen([sys.executable, "scanner.py"])
+    scanner_process = subprocess.Popen([sys.executable, "scanner_hammer.py"])
     hammer_process = subprocess.Popen([sys.executable, "bot_hammer.py"])
     
     try:

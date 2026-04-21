@@ -53,13 +53,22 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 *   **Daily Stop-Loss:** Automatically shuts down if it hits 3 consecutive stop-losses to protect capital during choppy markets.
 *   **Cumulative Profit Tracking:** Saves and reports overall bot profit locally and via Telegram after every trade.
 
-###  Market Scanner (`scanner.py`)
+###  Market Scanner (`scanner_hammer.py`)
 *The High-Frequency "Bloodhound" Radar for finding instant pump momentum.*
 
-*   **Tape Dominance (1m):** Analyzes the live, forming 1-minute candle. Triggers only if Market Buys exceed Market Sells by $\ge$ 2.0x.
-*   **Order Book Support:** Scans the order book at 0.5% depth. The Buy Wall (Bids) must be $\ge$ 1.5x thicker than the Sell Wall (Asks).
-*   **Spread & Momentum Filter:** Rejects coins with a spread > 0.1% and requires a live price jump of $\ge$ 0.1%.
+*   **Tape Dominance (1m):** Analyzes the live, forming 1-minute candle. Triggers only if Market Buys exceed Market Sells by $\ge$ 1.5x.
+*   **Order Book Support:** Scans the order book at 0.5% depth. The Buy Wall (Bids) must be $\ge$ 1.2x thicker than the Sell Wall (Asks).
+*   **Spread & Momentum Filter:** Rejects coins with a spread > 0.2% and requires a live price jump of $\ge$ 0.1%.
 *   **Hammer Integration:** Drops instantaneous signals into a local file for the Hammer bot to execute without API latency.
+
+### 🕵️ Flat Range Scanner (`scanner_aggressor.py`)
+*The ideal companion for the Aggressor grid bot, finding coins trapped in a tight consolidation channel.*
+
+*   **Volume & Asset Filter:** Requires $\ge$ 2M USDT daily volume and automatically excludes stablecoins, fiat, and heavyweights (BTC, ETH, SOL, etc.) to focus on volatile mid-caps.
+*   **14-Day Channel Analysis:** Analyzes the last 14 daily candles to find the absolute High and Low.
+*   **Corridor Width:** Only selects coins where the total 14-day price range is between a tight 5% and 15%.
+*   **Safe Entry Position:** Ensures the current price is comfortably in the middle of the channel (between 20% and 80%), avoiding immediate breakout risks at the absolute top or bottom.
+*   **Telegram Reports:** Automatically sorts the best candidates by the narrowest corridor and sends a Top-20 report directly to your Telegram.
 
 ---
 
@@ -126,6 +135,9 @@ python bot_aggressor.py
 
 # Run the targeted strikes on the market
 python start_hammer.py
+
+# Run the flat range scanner to find coins for the Aggressor
+python scanner_aggressor.py
 ```
 
 ---
