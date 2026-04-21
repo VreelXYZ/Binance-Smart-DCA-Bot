@@ -3,6 +3,8 @@ keys.txt
 
 multi_orders.json
 aggressor_orders.json
+hammer_signals.txt
+hammer_profit.json
 
 venv/
 env/
