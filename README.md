@@ -49,7 +49,7 @@ This suite features two distinct algorithmic powerhouses, allowing you to switch
 
 *   **100% In/Out Execution:** Trades the allocated budget in a single market order. No DCA grids or averaging.
 *   **Live WebSocket Tracking:** Connects to Binance via `ccxt.pro` WebSockets for millisecond-level price tracking.
-*   **Dynamic Step Trailing:** Base stop at -0.22%. As profit grows, the stop loss ratchets up in +0.25% steps (e.g., +0.50% profit moves the stop to +0.25%).
+*   **Dynamic Step Trailing:** Base stop at -0.22%. As profit grows, the stop loss ratchets up in +0.22% steps (e.g., +0.44% profit moves the stop to +0.22%).
 *   **Daily Stop-Loss:** Automatically shuts down if it hits 3 consecutive stop-losses to protect capital during choppy markets.
 *   **Cumulative Profit Tracking:** Saves and reports overall bot profit locally and via Telegram after every trade.
 
@@ -124,8 +124,8 @@ python bot_conservator.py
 # Run the high-volatility hunter
 python bot_aggressor.py
 
-# Run the pump radar
-python scanner.py
+# Run the targeted strikes on the market
+python start_hammer.py
 ```
 
 ---

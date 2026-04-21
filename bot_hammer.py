@@ -44,6 +44,20 @@ async def manage_position(exchange, symbol, buy_price, amount):
     tg.send_message(f"🔨 *HAMMER BOUGHT* {symbol}\nEntry: {buy_price}\nAmount: {amount}\nInitial Stop: {stop_trigger:.4f} (-0.22%)")
     print(f"✅ [ENTER] {symbol} | Buy Price: {buy_price} | Amount: {amount}")
     
+    hard_stop_id = None
+    try:
+        # Place a "hard" emergency stop-loss on the exchange in case the bot freezes (-1.5%)
+        stop_price = float(exchange.price_to_precision(symbol, buy_price * 0.985))
+        limit_price = float(exchange.price_to_precision(symbol, buy_price * 0.980)) # Limit price slightly lower to guarantee execution
+        
+        hard_stop_order = await exchange.create_order(
+            symbol, 'STOP_LOSS_LIMIT', 'sell', amount, limit_price, {'stopPrice': stop_price}
+        )
+        hard_stop_id = hard_stop_order['id']
+        print(f"🛡️ [{symbol}] Emergency hard stop-loss placed on the exchange ({stop_price})")
+    except Exception as e:
+        print(f"⚠️ [{symbol}] Failed to place emergency stop-loss: {e}")
+
     while bot_active:
         try:
             # Async WebSocket stream
@@ -57,13 +71,13 @@ async def manage_position(exchange, symbol, buy_price, amount):
             profit_pct = (current_price - buy_price) / buy_price
             
             # ------------------------------------------------
-            # STEP TRAILING (Step: 0.25%)
-            # +0.50% -> stop at +0.25%
-            # +0.75% -> stop at +0.50% and so on
+            # STEP TRAILING (Step: 0.22%)
+            # +0.22% -> stop at 0 (breakeven)
+            # +0.44% -> stop at +0.22% and so on
             # ------------------------------------------------
-            if profit_pct >= 0.0025:
-                steps_achieved = int(profit_pct // 0.0025)
-                dynamic_stop_pct = (steps_achieved - 1) * 0.0025
+            if profit_pct >= 0.0022:
+                steps_achieved = int(profit_pct // 0.0022)
+                dynamic_stop_pct = (steps_achieved - 1) * 0.0022
                 new_stop = buy_price * (1 + dynamic_stop_pct)
                 
                 # Stop-trigger moves only upwards
@@ -77,6 +91,14 @@ async def manage_position(exchange, symbol, buy_price, amount):
             # ------------------------------------------------
             if current_price <= stop_trigger:
                 print(f"⚠️ [{symbol}] EXIT TRIGGERED at {current_price}! Executing Market Sell...")
+                
+                # Cancel the hard stop order to unlock the balance before the market sell
+                if hard_stop_id:
+                    try:
+                        await exchange.cancel_order(hard_stop_id, symbol)
+                    except Exception as e:
+                        print(f"[{symbol}] Error cancelling emergency stop: {e}")
+                        
                 try:
                     sell_order = await exchange.create_market_sell_order(symbol, amount)
                     sell_price = float(sell_order.get('average') or current_price)
